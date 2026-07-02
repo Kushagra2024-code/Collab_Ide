@@ -1,0 +1,27 @@
+kind = "web"
+previewPath = "/"
+title = "CollabIDE"
+version = "1.0.0"
+id = "artifacts/collab-ide"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 19582
+
+[services.development]
+run = "pnpm --filter @workspace/collab-ide run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/collab-ide", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/collab-ide/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "19582"
+BASE_PATH = "/"

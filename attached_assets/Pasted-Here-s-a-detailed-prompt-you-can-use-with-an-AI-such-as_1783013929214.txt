@@ -1,0 +1,451 @@
+Here's a detailed prompt you can use with an AI (such as ChatGPT, Claude, Gemini, or Cursor) to generate a production-ready collaborative coding platform.
+
+---
+
+### Prompt
+
+I want to build a **real-time collaborative coding platform** similar to VS Code Live Share or Replit Multiplayer, where multiple developers can work on the same project simultaneously.
+
+## Goal
+
+Build a full-stack web application that allows teams to collaborate on coding projects in real time while tracking every user's activity.
+
+### Tech Stack
+
+Use:
+
+* Frontend: React + TypeScript + Tailwind CSS
+* Backend: Spring Boot (Java)
+* Database: PostgreSQL
+* Authentication: JWT + OAuth (Google/GitHub)
+* Real-time Communication: WebSockets (Socket.IO or Spring WebSocket)
+* Code Editor: Monaco Editor (VS Code editor)
+* Redis (optional for scaling)
+* Docker + Docker Compose
+* Nginx for deployment
+
+---
+
+# Core Features
+
+## 1. Authentication
+
+* Sign Up
+* Login
+* Google Login
+* GitHub Login
+* JWT Authentication
+* Forgot Password
+* Email Verification
+
+---
+
+## 2. Dashboard
+
+Users should see:
+
+* My Projects
+* Shared Projects
+* Recently Opened
+* Create New Project
+* Search Projects
+* Notifications
+
+---
+
+## 3. Project Management
+
+Users can:
+
+* Create Project
+* Delete Project
+* Rename Project
+* Invite Members
+* Remove Members
+* Assign Roles
+
+Roles:
+
+* Owner
+* Admin
+* Editor
+* Viewer
+
+---
+
+## 4. Real-Time Collaborative Coding
+
+Implement Google Docs–style collaboration.
+
+Features:
+
+* Multiple users editing simultaneously
+* Live cursor positions
+* User name beside cursor
+* Different cursor colors
+* Live typing
+* Conflict-free synchronization (CRDT or Operational Transformation)
+* Auto-save
+* Undo/Redo
+* File explorer
+* Folder support
+* Create/Delete/Rename files
+* Multiple tabs
+* Syntax highlighting
+* Auto completion
+* Code formatting
+* Search in files
+
+---
+
+## 5. Live Presence
+
+Show:
+
+* Users currently online
+* Active file
+* Current cursor location
+* Last active time
+* Typing indicator
+
+---
+
+## 6. Activity Tracking
+
+Track every user action.
+
+Store:
+
+* User joined project
+* User left
+* File created
+* File deleted
+* File renamed
+* Code inserted
+* Code removed
+* Cursor movement
+* Chat messages
+* Project settings changed
+
+Show activity timeline.
+
+Example:
+
+```
+10:12 AM
+Rahul edited App.java
+
+10:13 AM
+Aman created UserService.java
+
+10:14 AM
+Priya deleted test.js
+```
+
+---
+
+## 7. Version History
+
+Maintain complete history.
+
+Allow users to:
+
+* View previous versions
+* Restore previous version
+* Compare versions (Diff View)
+* Show author of each change
+
+---
+
+## 8. Live Chat
+
+Inside every project include:
+
+* Group Chat
+* Private Messages
+* Emoji Support
+* File Sharing
+* Code Snippets
+* Reply to Message
+* Edit Message
+* Delete Message
+* Typing Indicator
+* Read Receipts
+
+---
+
+## 9. Voice & Video (Bonus)
+
+Integrate WebRTC.
+
+Features:
+
+* Audio Call
+* Video Call
+* Screen Sharing
+* Mute
+* Camera Toggle
+* Raise Hand
+
+---
+
+## 10. Notifications
+
+Real-time notifications:
+
+* User joined
+* User left
+* Mention (@username)
+* New chat
+* Invitation
+* Role updated
+* Project shared
+
+---
+
+## 11. Permission System
+
+Permission matrix:
+
+Owner:
+
+* Full access
+
+Admin:
+
+* Manage users
+* Edit files
+
+Editor:
+
+* Edit code
+
+Viewer:
+
+* Read only
+
+---
+
+## 12. Code Execution
+
+Support running code.
+
+Languages:
+
+* Java
+* C++
+* Python
+* JavaScript
+
+Display:
+
+* Console Output
+* Runtime
+* Errors
+
+(Optional: Docker sandbox for secure execution.)
+
+---
+
+## 13. Git Integration
+
+Allow:
+
+* Clone Repository
+* Commit
+* Push
+* Pull
+* Branch Creation
+* Merge
+* Commit History
+
+---
+
+## 14. Search
+
+Global Search:
+
+* Files
+* Users
+* Chat
+* Activity Logs
+
+---
+
+## 15. Project Analytics
+
+Dashboard should show:
+
+* Total commits
+* Total edits
+* Most active user
+* Online users
+* Files modified today
+* Chat activity
+* Weekly productivity graph
+
+---
+
+## 16. Admin Panel
+
+Admin can:
+
+* Manage users
+* Ban users
+* Delete projects
+* Monitor server
+* View logs
+* Storage usage
+* Active sessions
+
+---
+
+## 17. Security
+
+Implement:
+
+* JWT
+* Refresh Tokens
+* Role-Based Access Control (RBAC)
+* Rate Limiting
+* CSRF Protection
+* XSS Protection
+* SQL Injection Prevention
+* Input Validation
+* HTTPS
+
+---
+
+## 18. Database Design
+
+Design normalized PostgreSQL schema for:
+
+* Users
+* Projects
+* Members
+* Roles
+* Files
+* File Versions
+* Activity Logs
+* Chat Messages
+* Notifications
+* Sessions
+* Invitations
+
+Provide ER Diagram.
+
+---
+
+## 19. REST APIs
+
+Design complete REST APIs.
+
+Examples:
+
+```
+POST /auth/login
+
+POST /projects
+
+GET /projects
+
+POST /projects/{id}/invite
+
+GET /projects/{id}/members
+
+GET /files/{id}
+
+PUT /files/{id}
+
+GET /activity
+
+GET /chat
+
+POST /chat/message
+```
+
+---
+
+## 20. WebSocket Events
+
+Design real-time events.
+
+Examples:
+
+```
+JOIN_PROJECT
+
+LEAVE_PROJECT
+
+CODE_CHANGE
+
+CURSOR_MOVE
+
+FILE_CREATED
+
+FILE_DELETED
+
+CHAT_MESSAGE
+
+USER_TYPING
+
+USER_ONLINE
+
+USER_OFFLINE
+
+VERSION_CREATED
+
+NOTIFICATION
+```
+
+---
+
+## 21. UI/UX
+
+Create a modern UI inspired by:
+
+* VS Code
+* GitHub
+* Replit
+* Cursor IDE
+
+Layout:
+
+```
+-------------------------------------------------
+Sidebar
+Project Explorer
+---------------------------------
+Monaco Editor
+---------------------------------
+Right Panel
+Online Users
+
+Bottom Panel
+Chat
+Console
+Problems
+```
+
+---
+
+## 22. Deliverables
+
+Generate:
+
+1. Complete system architecture diagram.
+2. PostgreSQL database schema and ER diagram.
+3. Backend folder structure (Spring Boot).
+4. Frontend folder structure (React).
+5. REST API documentation.
+6. WebSocket event documentation.
+7. Authentication flow.
+8. Real-time collaboration architecture (CRDT or Operational Transformation).
+9. Deployment using Docker Compose and Nginx.
+10. Scalable architecture supporting 10,000+ concurrent users.
+11. Clean, modular, production-ready code following industry best practices.
+12. Unit tests and integration tests.
+13. CI/CD pipeline (GitHub Actions).
+14. Comprehensive project documentation and setup instructions.
+
+The final solution should be scalable, secure, maintainable, and production-ready, with an emphasis on real-time collaboration, user activity tracking, and seamless communication between team members.

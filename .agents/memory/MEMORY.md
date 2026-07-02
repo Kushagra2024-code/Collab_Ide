@@ -1,0 +1,2 @@
+- [CollabIDE stack decisions](collab-ide-stack.md) — Node/Express/Drizzle/Socket.io/React+Monaco; JWT via SESSION_SECRET env var (no fallback).
+- [CollabIDE security patterns](collab-ide-security.md) — requireProjectMember middleware + socket room-gating pattern to use for any new project-scoped endpoint/event.
