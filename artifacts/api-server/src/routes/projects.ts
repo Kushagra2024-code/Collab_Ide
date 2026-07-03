@@ -1,7 +1,8 @@
 import { Router, type IRouter } from "express";
 import { eq, and, or, sql, desc } from "drizzle-orm";
-import { db, projectsTable, projectMembersTable, usersTable, activityLogsTable, chatMessagesTable, projectFilesTable } from "@workspace/db";
+import { db, projectsTable, projectMembersTable, usersTable, activityLogsTable, chatMessagesTable, projectFilesTable, fileVersionsTable, notificationsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
+import { emitToUser } from "../socket";
 import {
   ListProjectsQueryParams,
   ListProjectsResponse,
@@ -30,9 +31,15 @@ const router: IRouter = Router();
 
 // Helper: enrich project with owner info and counts
 async function enrichProject(project: typeof projectsTable.$inferSelect, userId: number) {
-  const owner = await db.select().from(usersTable).where(eq(usersTable.id, project.ownerId));
-  const members = await db.select().from(projectMembersTable).where(eq(projectMembersTable.projectId, project.id));
-  const files = await db.select().from(projectFilesTable).where(and(eq(projectFilesTable.projectId, project.id), eq(projectFilesTable.type, "file")));
+  const [owner, members, files, lastActivityRows] = await Promise.all([
+    db.select().from(usersTable).where(eq(usersTable.id, project.ownerId)),
+    db.select().from(projectMembersTable).where(eq(projectMembersTable.projectId, project.id)),
+    db.select().from(projectFilesTable).where(and(eq(projectFilesTable.projectId, project.id), eq(projectFilesTable.type, "file"))),
+    db.select().from(activityLogsTable)
+      .where(and(eq(activityLogsTable.projectId, project.id), eq(activityLogsTable.userId, userId)))
+      .orderBy(desc(activityLogsTable.createdAt))
+      .limit(1),
+  ]);
   const userMember = members.find((m) => m.userId === userId);
   return {
     id: project.id,
@@ -46,7 +53,7 @@ async function enrichProject(project: typeof projectsTable.$inferSelect, userId:
     memberCount: members.length,
     fileCount: files.length,
     role: userMember?.role ?? null,
-    lastOpenedAt: null,
+    lastOpenedAt: lastActivityRows[0]?.createdAt ?? null,
     createdAt: project.createdAt,
     updatedAt: project.updatedAt,
   };
@@ -275,6 +282,23 @@ router.post("/projects/:projectId/invite", requireAuth, async (req, res): Promis
     and(eq(projectMembersTable.projectId, params.data.projectId), eq(projectMembersTable.userId, targetUser.id))
   );
 
+  // Notify the invited user in-app and in real time
+  const [project] = await db.select().from(projectsTable).where(eq(projectsTable.id, params.data.projectId));
+  const [inviter] = await db.select().from(usersTable).where(eq(usersTable.id, userId));
+  const [notification] = await db.insert(notificationsTable).values({
+    userId: targetUser.id,
+    type: "project_invite",
+    message: `${inviter?.name ?? "Someone"} invited you to "${project?.name ?? "a project"}" as ${body.data.role}`,
+    projectId: params.data.projectId,
+    fromUserId: userId,
+  }).returning();
+  emitToUser(targetUser.id, "notification_received", {
+    id: notification.id, type: notification.type, message: notification.message,
+    isRead: false, projectId: notification.projectId ?? null,
+    projectName: project?.name ?? null, fromUserId: userId,
+    fromUserName: inviter?.name ?? null, createdAt: notification.createdAt,
+  });
+
   res.json(InviteMemberResponse.parse({
     userId: member.userId, projectId: member.projectId, role: member.role,
     name: targetUser.name, email: targetUser.email, avatarUrl: targetUser.avatarUrl ?? null,
@@ -351,9 +375,16 @@ router.get("/projects/:projectId/stats", requireAuth, async (req, res): Promise<
   }
   const projectId = params.data.projectId;
 
-  const activities = await db.select().from(activityLogsTable).where(eq(activityLogsTable.projectId, projectId));
-  const messages = await db.select().from(chatMessagesTable).where(eq(chatMessagesTable.projectId, projectId));
-  const members = await db.select().from(projectMembersTable).where(eq(projectMembersTable.projectId, projectId));
+  const [activities, messages, members, versionsResult] = await Promise.all([
+    db.select().from(activityLogsTable).where(eq(activityLogsTable.projectId, projectId)),
+    db.select().from(chatMessagesTable).where(eq(chatMessagesTable.projectId, projectId)),
+    db.select().from(projectMembersTable).where(eq(projectMembersTable.projectId, projectId)),
+    db.select({ count: sql<number>`count(*)::int` })
+      .from(fileVersionsTable)
+      .innerJoin(projectFilesTable, eq(fileVersionsTable.fileId, projectFilesTable.id))
+      .where(eq(projectFilesTable.projectId, projectId)),
+  ]);
+  const totalCommits = versionsResult[0]?.count ?? 0;
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);
@@ -370,10 +401,12 @@ router.get("/projects/:projectId/stats", requireAuth, async (req, res): Promise<
     if (count > maxCount) { maxCount = count; mostActiveUserId = parseInt(id); }
   }
 
-  let mostActiveUser = null;
+  let mostActiveUser: string | null = null;
+  let mostActiveUserAvatarUrl: string | null = null;
   if (mostActiveUserId) {
     const [u] = await db.select().from(usersTable).where(eq(usersTable.id, mostActiveUserId));
     mostActiveUser = u?.name ?? null;
+    mostActiveUserAvatarUrl = u?.avatarUrl ?? null;
   }
 
   // Weekly activity - last 7 days
@@ -390,12 +423,12 @@ router.get("/projects/:projectId/stats", requireAuth, async (req, res): Promise<
 
   res.json(GetProjectStatsResponse.parse({
     totalEdits: activities.length,
-    totalCommits: 0,
+    totalCommits,
     activeUsers: members.length,
     filesModifiedToday,
     chatActivity: messages.length,
     mostActiveUser,
-    mostActiveUserAvatarUrl: null,
+    mostActiveUserAvatarUrl,
     weeklyActivity,
   }));
 });

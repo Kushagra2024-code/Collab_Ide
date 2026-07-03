@@ -19,6 +19,8 @@ interface SocketEvents {
   chat_message: (data: { id: number; content: string; userId: number; userName: string; userAvatarUrl: string | null; createdAt: string }) => void;
   typing_start: (data: { userId: number; name: string }) => void;
   typing_stop: (data: { userId: number }) => void;
+  file_deleted: (data: { fileId: number; projectId: number }) => void;
+  notification_received: (data: { id: number; type: string; message: string; isRead: boolean; projectId: number | null; projectName: string | null; fromUserId: number | null; fromUserName: string | null; createdAt: string }) => void;
   error: (data: { message: string }) => void;
 }
 

@@ -3,6 +3,7 @@ import { eq, and } from "drizzle-orm";
 import { db, projectFilesTable, fileVersionsTable, usersTable, activityLogsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { requireProjectMember } from "../middlewares/requireProjectMember";
+import { emitToProject } from "../socket";
 import {
   ListFilesParams,
   ListFilesResponse,
@@ -188,6 +189,9 @@ router.delete(
     await db.insert(activityLogsTable).values({
       projectId: params.data.projectId, userId, action: "deleted file", targetType: "file", targetName: file.name,
     });
+
+    // Notify collaborators in real time so their file tree updates immediately
+    emitToProject(params.data.projectId, "file_deleted", { fileId: file.id, projectId: params.data.projectId });
 
     res.sendStatus(204);
   }

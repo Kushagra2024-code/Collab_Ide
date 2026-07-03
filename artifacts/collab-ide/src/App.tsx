@@ -12,6 +12,7 @@ import Dashboard from '@/pages/dashboard';
 import ProjectIDE from '@/pages/project-ide';
 import ProjectSettings from '@/pages/project-settings';
 import Notifications from '@/pages/notifications';
+import Profile from '@/pages/profile';
 
 const queryClient = new QueryClient();
 
@@ -52,6 +53,12 @@ function Router() {
       <Route path="/notifications">
         <ProtectedRoute>
           <Notifications />
+        </ProtectedRoute>
+      </Route>
+
+      <Route path="/profile">
+        <ProtectedRoute>
+          <Profile />
         </ProtectedRoute>
       </Route>
       

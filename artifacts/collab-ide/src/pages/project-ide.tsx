@@ -14,7 +14,8 @@ import {
   useListMessages,
   useSendMessage,
   useListActivity,
-  getGetProjectQueryKey
+  getGetProjectQueryKey,
+  getListFilesQueryKey,
 } from '@workspace/api-client-react';
 import { ProjectFile } from '@workspace/api-client-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -115,7 +116,7 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
       // Remote edits: update the React Query cache so the editor value reflects
       // changes from collaborators without resetting the local cursor.
       queryClient.setQueryData(
-        ['files', pId],
+        getListFilesQueryKey(pId),
         (old: any[] | undefined) =>
           old?.map(f => f.id === fileId ? { ...f, content } : f) ?? old,
       );
@@ -130,11 +131,30 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
       setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
     };
 
+    const onFileDeleted = ({ fileId }: { fileId: number; projectId: number }) => {
+      // Remove from React Query cache immediately — no round-trip needed
+      queryClient.setQueryData(
+        getListFilesQueryKey(pId),
+        (old: any[] | undefined) => old?.filter((f) => f.id !== fileId) ?? old,
+      );
+      // Close the tab and, if it was active, fall back to an adjacent open tab
+      setOpenFiles((prev) => {
+        const next = prev.filter((f) => f.id !== fileId);
+        setActiveFileId((cur) => {
+          if (cur !== fileId) return cur;
+          // Fall back to the last tab in the remaining list, or null if none
+          return next.length > 0 ? next[next.length - 1].id : null;
+        });
+        return next;
+      });
+    };
+
     on('presence_list', onPresenceList);
     on('user_joined', onUserJoined);
     on('user_left', onUserLeft);
     on('code_change', onCodeChange);
     on('chat_message', onChatMessage);
+    on('file_deleted', onFileDeleted);
 
     return () => {
       off('presence_list', onPresenceList);
@@ -142,6 +162,7 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
       off('user_left', onUserLeft);
       off('code_change', onCodeChange);
       off('chat_message', onChatMessage);
+      off('file_deleted', onFileDeleted);
     };
   }, [socket, pId, on, off, queryClient]);
 

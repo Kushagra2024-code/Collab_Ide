@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, timestamp, boolean } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, timestamp, boolean, index } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
 
@@ -12,7 +12,10 @@ export const chatMessagesTable = pgTable("chat_messages", {
   isEdited: boolean("is_edited").notNull().default(false),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow().$onUpdate(() => new Date()),
-});
+}, (t) => [
+  index("chat_messages_project_id_idx").on(t.projectId),
+  index("chat_messages_user_id_idx").on(t.userId),
+]);
 
 export const insertChatMessageSchema = createInsertSchema(chatMessagesTable).omit({ id: true, createdAt: true, updatedAt: true });
 export type InsertChatMessage = z.infer<typeof insertChatMessageSchema>;

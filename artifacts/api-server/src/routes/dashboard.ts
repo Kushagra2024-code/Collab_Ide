@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { eq, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql } from "drizzle-orm";
 import { db, projectsTable, projectMembersTable, activityLogsTable, notificationsTable, projectFilesTable, usersTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { GetDashboardSummaryResponse } from "@workspace/api-zod";
@@ -52,16 +52,22 @@ router.get("/dashboard/summary", requireAuth, async (req, res): Promise<void> =>
       .limit(5);
 
     recentProjects = await Promise.all(projects.map(async (p) => {
-      const owner = await db.select().from(usersTable).where(eq(usersTable.id, p.ownerId));
-      const members = await db.select().from(projectMembersTable).where(eq(projectMembersTable.projectId, p.id));
-      const files = await db.select().from(projectFilesTable).where(eq(projectFilesTable.projectId, p.id));
+      const [owner, members, files, lastActivityRows] = await Promise.all([
+        db.select().from(usersTable).where(eq(usersTable.id, p.ownerId)),
+        db.select().from(projectMembersTable).where(eq(projectMembersTable.projectId, p.id)),
+        db.select().from(projectFilesTable).where(eq(projectFilesTable.projectId, p.id)),
+        db.select().from(activityLogsTable)
+          .where(and(eq(activityLogsTable.projectId, p.id), eq(activityLogsTable.userId, userId)))
+          .orderBy(desc(activityLogsTable.createdAt))
+          .limit(1),
+      ]);
       const userMember = members.find((m) => m.userId === userId);
       return {
         id: p.id, name: p.name, description: p.description ?? null,
         language: p.language, ownerId: p.ownerId,
         ownerName: owner[0]?.name ?? null, ownerAvatarUrl: owner[0]?.avatarUrl ?? null,
         isPublic: p.isPublic, memberCount: members.length, fileCount: files.length,
-        role: userMember?.role ?? null, lastOpenedAt: null,
+        role: userMember?.role ?? null, lastOpenedAt: lastActivityRows[0]?.createdAt ?? null,
         createdAt: p.createdAt, updatedAt: p.updatedAt,
       };
     }));

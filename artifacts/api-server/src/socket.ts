@@ -15,6 +15,25 @@ interface ConnectedUser {
 
 const connectedUsers = new Map<string, ConnectedUser>();
 
+// Per-user socket tracking — allows server-side push to a specific user
+const userSockets = new Map<number, Set<string>>();
+
+let _io: SocketIOServer | null = null;
+
+/** Emit an event to every socket in a project room. */
+export function emitToProject(projectId: number | string, event: string, data: unknown): void {
+  _io?.to(`project:${projectId}`).emit(event, data);
+}
+
+/** Emit an event to all active sockets belonging to a specific user. */
+export function emitToUser(userId: number, event: string, data: unknown): void {
+  const sids = userSockets.get(userId);
+  if (!sids) return;
+  for (const sid of sids) {
+    _io?.to(sid).emit(event, data);
+  }
+}
+
 /** Verify that a userId is an authorized member of a project (or project is public for reads). */
 async function isAuthorizedForProject(userId: number, projectId: number): Promise<boolean> {
   const [member] = await db.select().from(projectMembersTable).where(
@@ -26,19 +45,13 @@ async function isAuthorizedForProject(userId: number, projectId: number): Promis
   return project?.isPublic === true;
 }
 
-/** Return the user's role in a project, or null if unauthorized. */
-async function getProjectRole(userId: number, projectId: number): Promise<string | null> {
-  const [member] = await db.select().from(projectMembersTable).where(
-    and(eq(projectMembersTable.projectId, projectId), eq(projectMembersTable.userId, userId))
-  );
-  return member?.role ?? null;
-}
-
 export function initSocket(httpServer: HttpServer): SocketIOServer {
   const io = new SocketIOServer(httpServer, {
     path: "/ws/socket.io",
     cors: { origin: "*", methods: ["GET", "POST"] },
   });
+
+  _io = io;
 
   // ── Authentication middleware ──────────────────────────────────────────────
   io.use(async (socket, next) => {
@@ -66,6 +79,10 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
 
     logger.info({ userId, userName }, "Socket connected");
     connectedUsers.set(socket.id, { userId, name: userName, avatarUrl: userAvatarUrl, projectId: null });
+
+    // Track per-user socket IDs for targeted pushes
+    if (!userSockets.has(userId)) userSockets.set(userId, new Set());
+    userSockets.get(userId)!.add(socket.id);
 
     // ── join_project: verify DB membership before joining room ───────────────
     socket.on("join_project", async (projectId: unknown) => {
@@ -95,7 +112,7 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
 
       socket.to(`project:${projectIdStr}`).emit("user_joined", { userId, name: userName, avatarUrl: userAvatarUrl });
 
-      // Send current presence list
+      // Send current presence list to the joining socket
       const usersInProject = Array.from(connectedUsers.values()).filter((u) => u.projectId === projectIdStr);
       socket.emit("presence_list", usersInProject);
     });
@@ -123,15 +140,24 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
       ) return;
 
       const { projectId, fileId, content } = data as { projectId: string; fileId: number; content: string };
-      if (!isInRoom(String(projectId))) return; // Must be in the room to broadcast
+      if (!isInRoom(String(projectId))) return;
 
       socket.to(`project:${projectId}`).emit("code_change", { projectId, fileId, content, userId, userName });
     });
+
+    // Cursor moves are throttled per socket to 20 fps (50ms) to avoid flooding
+    const cursorLastEmit = new Map<string, number>();
 
     socket.on("cursor_move", (data: unknown) => {
       if (typeof data !== "object" || data === null) return;
       const { projectId, fileId, line, column } = data as any;
       if (!isInRoom(String(projectId))) return;
+
+      const now = Date.now();
+      const key = `${socket.id}:${fileId}`;
+      const last = cursorLastEmit.get(key) ?? 0;
+      if (now - last < 50) return; // throttle to 20 fps
+      cursorLastEmit.set(key, now);
 
       const user = connectedUsers.get(socket.id);
       if (user) connectedUsers.set(socket.id, { ...user, cursor: { line, column } });
@@ -166,6 +192,14 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
         socket.to(`project:${user.projectId}`).emit("user_left", { userId, name: userName, avatarUrl: userAvatarUrl });
       }
       connectedUsers.delete(socket.id);
+
+      // Remove from per-user socket tracking
+      const sids = userSockets.get(userId);
+      if (sids) {
+        sids.delete(socket.id);
+        if (sids.size === 0) userSockets.delete(userId);
+      }
+
       logger.info({ userId, userName }, "Socket disconnected");
     });
   });
