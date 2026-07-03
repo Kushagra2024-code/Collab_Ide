@@ -30,7 +30,8 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Code2, Play, Users, Settings, Share2, PanelLeftClose, PanelRightClose,
   FileCode2, FileJson, FileText, FolderTree, FilePlus2, FolderPlus,
-  MessageSquare, Terminal, AlertCircle, X, ChevronRight, ChevronDown,
+  MessageSquare, Terminal, AlertCircle, XCircle, AlertTriangle, Info,
+  CheckCircle, X, ChevronRight, ChevronDown,
   Loader2, SendHorizonal, Sparkles, Activity
 } from 'lucide-react';
 import { AIPanel } from '@/components/ai-panel';
@@ -86,6 +87,20 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
   const [newFileName, setNewFileName] = useState('');
 
   const activeFile = useMemo(() => files?.find(f => f.id === activeFileId), [files, activeFileId]);
+
+  // Diagnostics — populated by Monaco marker listener
+  interface DiagnosticMarker {
+    fileId: number | null;
+    fileName: string;
+    startLineNumber: number;
+    startColumn: number;
+    message: string;
+    severity: number; // monaco MarkerSeverity: Error=8, Warning=4, Info=2, Hint=1
+    code?: string | number;
+  }
+  const [diagnostics, setDiagnostics] = useState<DiagnosticMarker[]>([]);
+  const filesRef = useRef(files);
+  useEffect(() => { filesRef.current = files; }, [files]);
 
   // Handle Socket Events
   useEffect(() => {
@@ -173,20 +188,80 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
     if (initialMessages) setMessages(initialMessages);
   }, [initialMessages]);
 
-  // Monaco setup for theme
+  // Monaco setup: theme + TypeScript diagnostics + marker listener
   useEffect(() => {
-    if (monaco) {
-      monaco.editor.defineTheme('collab-dark', {
-        base: 'vs-dark',
-        inherit: true,
-        rules: [],
-        colors: {
-          'editor.background': '#0A0A0A', // hsl(240 10% 4%)
-          'editor.lineHighlightBackground': '#1A1A1A',
+    if (!monaco) return;
+
+    monaco.editor.defineTheme('collab-dark', {
+      base: 'vs-dark',
+      inherit: true,
+      rules: [],
+      colors: {
+        'editor.background': '#0A0A0A',
+        'editor.lineHighlightBackground': '#1A1A1A',
+      }
+    });
+    monaco.editor.setTheme('collab-dark');
+
+    // Configure TypeScript language service diagnostics
+    const tsDefaults = monaco.languages.typescript.typescriptDefaults;
+    tsDefaults.setDiagnosticsOptions({
+      noSemanticValidation: false,
+      noSyntaxValidation: false,
+      noSuggestionDiagnostics: false,
+    });
+    tsDefaults.setCompilerOptions({
+      target: monaco.languages.typescript.ScriptTarget.ESNext,
+      allowNonTsExtensions: true,
+      moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+      module: monaco.languages.typescript.ModuleKind.CommonJS,
+      noEmit: true,
+      esModuleInterop: true,
+      jsx: monaco.languages.typescript.JsxEmit.React,
+      reactNamespace: 'React',
+      allowJs: true,
+      checkJs: false,
+      strict: false,
+      skipLibCheck: true,
+    });
+
+    // Also enable JS syntax checking
+    monaco.languages.typescript.javascriptDefaults.setDiagnosticsOptions({
+      noSemanticValidation: true, // too noisy for plain JS without types
+      noSyntaxValidation: false,
+    });
+
+    // Subscribe to marker changes across all models
+    const disposable = monaco.editor.onDidChangeModelMarkers(() => {
+      const allMarkers: DiagnosticMarker[] = [];
+      for (const model of monaco.editor.getModels()) {
+        const markers = monaco.editor.getModelMarkers({ resource: model.uri });
+        // Model path is "/file-{id}" based on the path prop we pass to Editor
+        const pathMatch = model.uri.path.match(/\/file-(\d+)$/);
+        const fileId = pathMatch ? parseInt(pathMatch[1], 10) : null;
+        const matchedFile = fileId != null
+          ? filesRef.current?.find(f => f.id === fileId)
+          : undefined;
+        for (const m of markers) {
+          // Skip suggestion-level noise (severity 1 = Hint)
+          if (m.severity < 2) continue;
+          allMarkers.push({
+            fileId: fileId ?? null,
+            fileName: matchedFile?.name ?? model.uri.path,
+            startLineNumber: m.startLineNumber,
+            startColumn: m.startColumn,
+            message: m.message,
+            severity: m.severity,
+            code: typeof m.code === 'object' ? String((m.code as any).value) : m.code,
+          });
         }
-      });
-      monaco.editor.setTheme('collab-dark');
-    }
+      }
+      // Sort: errors first, then warnings, then info
+      allMarkers.sort((a, b) => b.severity - a.severity);
+      setDiagnostics(allMarkers);
+    });
+
+    return () => disposable.dispose();
   }, [monaco]);
 
   // Actions
@@ -365,18 +440,28 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
                       </form>
                     )}
                     
-                    {tree.map(file => (
-                      <div 
-                        key={file.id} 
-                        onClick={() => handleOpenFile(file)}
-                        className={`flex items-center gap-2 px-2 py-1 text-sm cursor-pointer rounded-md transition-colors ${
-                          activeFileId === file.id ? 'bg-primary/20 text-primary font-medium' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-                        }`}
-                      >
-                        {getFileIcon(file)}
-                        <span className="truncate font-mono text-xs">{file.name}</span>
-                      </div>
-                    ))}
+                    {tree.map(file => {
+                      const fileErrors = diagnostics.filter(d => d.fileId === file.id && d.severity === 8).length;
+                      const fileWarnings = diagnostics.filter(d => d.fileId === file.id && d.severity === 4).length;
+                      return (
+                        <div 
+                          key={file.id} 
+                          onClick={() => handleOpenFile(file)}
+                          className={`flex items-center gap-2 px-2 py-1 text-sm cursor-pointer rounded-md transition-colors ${
+                            activeFileId === file.id ? 'bg-primary/20 text-primary font-medium' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
+                          }`}
+                        >
+                          {getFileIcon(file)}
+                          <span className="truncate font-mono text-xs flex-1">{file.name}</span>
+                          {fileErrors > 0 && (
+                            <span className="text-[9px] font-bold text-destructive bg-destructive/10 rounded px-1 shrink-0">{fileErrors}</span>
+                          )}
+                          {fileErrors === 0 && fileWarnings > 0 && (
+                            <span className="text-[9px] font-bold text-yellow-500 bg-yellow-500/10 rounded px-1 shrink-0">{fileWarnings}</span>
+                          )}
+                        </div>
+                      );
+                    })}
                   </div>
                 </ScrollArea>
               </Panel>
@@ -413,6 +498,7 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
               {activeFileId ? (
                 <Editor
                   height="100%"
+                  path={`file-${activeFileId}`}
                   language={activeFile?.language || 'javascript'}
                   value={activeFile?.content || ''}
                   onChange={handleEditorChange}
@@ -452,7 +538,16 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
                       Terminal
                     </TabsTrigger>
                     <TabsTrigger value="problems" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 h-full text-xs uppercase tracking-wider">
-                      Problems <Badge variant="secondary" className="ml-2 h-4 px-1 rounded-sm text-[10px]">0</Badge>
+                      Problems
+                      {diagnostics.length > 0 ? (
+                        <Badge variant="destructive" className="ml-2 h-4 px-1 rounded-sm text-[10px]">
+                          {diagnostics.filter(d => d.severity === 8).length > 0
+                            ? diagnostics.filter(d => d.severity === 8).length
+                            : diagnostics.length}
+                        </Badge>
+                      ) : (
+                        <Badge variant="secondary" className="ml-2 h-4 px-1 rounded-sm text-[10px]">0</Badge>
+                      )}
                     </TabsTrigger>
                   </TabsList>
                 </div>
@@ -498,11 +593,45 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
                   <TerminalPanel socket={socket} projectId={pId} />
                 </TabsContent>
 
-                <TabsContent value="problems" className="flex-1 m-0 p-4 bg-background">
-                  <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
-                    <CheckCircle className="w-8 h-8 mb-2 opacity-50 text-emerald-500" />
-                    <p className="text-sm">No problems detected in workspace.</p>
-                  </div>
+                <TabsContent value="problems" className="flex-1 m-0 data-[state=active]:flex flex-col min-h-0 bg-background">
+                  {diagnostics.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center h-full text-muted-foreground">
+                      <CheckCircle className="w-8 h-8 mb-2 opacity-50 text-emerald-500" />
+                      <p className="text-sm">No problems detected in workspace.</p>
+                    </div>
+                  ) : (
+                    <ScrollArea className="flex-1">
+                      <div className="py-1">
+                        {diagnostics.map((d, i) => (
+                          <button
+                            key={i}
+                            onClick={() => {
+                              if (d.fileId != null) {
+                                const f = files?.find(f => f.id === d.fileId);
+                                if (f) handleOpenFile(f);
+                              }
+                            }}
+                            className="w-full flex items-start gap-2 px-3 py-1.5 hover:bg-secondary text-left group"
+                          >
+                            {d.severity === 8 ? (
+                              <XCircle className="w-3.5 h-3.5 text-destructive shrink-0 mt-0.5" />
+                            ) : d.severity === 4 ? (
+                              <AlertTriangle className="w-3.5 h-3.5 text-yellow-500 shrink-0 mt-0.5" />
+                            ) : (
+                              <Info className="w-3.5 h-3.5 text-blue-400 shrink-0 mt-0.5" />
+                            )}
+                            <span className="flex-1 min-w-0">
+                              <span className="text-xs text-foreground/90 leading-snug block truncate">{d.message}</span>
+                              <span className="text-[10px] text-muted-foreground font-mono mt-0.5 block">
+                                {d.fileName}:{d.startLineNumber}:{d.startColumn}
+                                {d.code ? <span className="ml-2 opacity-60">({d.code})</span> : null}
+                              </span>
+                            </span>
+                          </button>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
                 </TabsContent>
               </Tabs>
             </div>
@@ -559,22 +688,3 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
   );
 }
 
-function CheckCircle(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-      <polyline points="22 4 12 14.01 9 11.01" />
-    </svg>
-  )
-}
