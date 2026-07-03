@@ -1,9 +1,41 @@
 import { Server as HttpServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
+import { spawn, ChildProcessWithoutNullStreams } from "child_process";
+import { mkdirSync, existsSync } from "fs";
+import path from "path";
+import os from "os";
 import { verifyToken } from "./lib/auth";
 import { db, usersTable, projectMembersTable, projectsTable } from "@workspace/db";
 import { and, eq } from "drizzle-orm";
 import { logger } from "./lib/logger";
+
+// ── Terminal session management ────────────────────────────────────────────
+interface TerminalSession {
+  process: ChildProcessWithoutNullStreams;
+  projectId: string;
+}
+
+const terminalSessions = new Map<string, TerminalSession>(); // key: `${socketId}:${termId}`
+
+function getProjectWorkdir(projectId: string): string {
+  const dir = path.join(os.tmpdir(), "collab-ide-terminals", `project-${projectId}`);
+  if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+  return dir;
+}
+
+function spawnShell(cwd: string): ChildProcessWithoutNullStreams {
+  return spawn("bash", ["--norc", "--noprofile"], {
+    cwd,
+    env: {
+      ...process.env,
+      TERM: "xterm-256color",
+      COLORTERM: "truecolor",
+      PS1: "\\u@collab-ide:\\w\\$ ",
+      FORCE_COLOR: "1",
+    },
+    shell: false,
+  });
+}
 
 interface ConnectedUser {
   userId: number;
@@ -186,7 +218,68 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
       socket.to(`project:${projectId}`).emit("typing_stop", { userId });
     });
 
+    // ── Terminal events ──────────────────────────────────────────────────────
+    socket.on("terminal_create", (data: unknown) => {
+      if (typeof data !== "object" || data === null || !("termId" in data) || !("projectId" in data)) return;
+      const { termId, projectId } = data as { termId: string; projectId: string };
+      if (!isInRoom(String(projectId))) return;
+
+      const sessionKey = `${socket.id}:${termId}`;
+      if (terminalSessions.has(sessionKey)) return; // already exists
+
+      const cwd = getProjectWorkdir(String(projectId));
+      const proc = spawnShell(cwd);
+
+      proc.stdout.on("data", (chunk: Buffer) => {
+        socket.emit("terminal_output", { termId, data: chunk.toString("utf8") });
+      });
+      proc.stderr.on("data", (chunk: Buffer) => {
+        socket.emit("terminal_output", { termId, data: chunk.toString("utf8") });
+      });
+      proc.on("close", (code) => {
+        socket.emit("terminal_exit", { termId, code });
+        terminalSessions.delete(sessionKey);
+      });
+
+      terminalSessions.set(sessionKey, { process: proc, projectId: String(projectId) });
+
+      // Send initial prompt trigger
+      proc.stdin.write("PS1='\\u@collab-ide:\\w\\$ '; export PS1; echo\n");
+    });
+
+    socket.on("terminal_input", (data: unknown) => {
+      if (typeof data !== "object" || data === null || !("termId" in data) || !("input" in data)) return;
+      const { termId, input } = data as { termId: string; input: string };
+      const session = terminalSessions.get(`${socket.id}:${termId}`);
+      if (!session || session.process.killed) return;
+      session.process.stdin.write(input);
+    });
+
+    socket.on("terminal_resize", (data: unknown) => {
+      // No-op without PTY — resize info is tracked client-side by xterm
+      void data;
+    });
+
+    socket.on("terminal_close", (data: unknown) => {
+      if (typeof data !== "object" || data === null || !("termId" in data)) return;
+      const { termId } = data as { termId: string };
+      const sessionKey = `${socket.id}:${termId}`;
+      const session = terminalSessions.get(sessionKey);
+      if (session) {
+        session.process.kill("SIGTERM");
+        terminalSessions.delete(sessionKey);
+      }
+    });
+
     socket.on("disconnect", () => {
+      // Kill all terminal sessions for this socket
+      for (const [key, session] of terminalSessions) {
+        if (key.startsWith(`${socket.id}:`)) {
+          session.process.kill("SIGTERM");
+          terminalSessions.delete(key);
+        }
+      }
+
       const user = connectedUsers.get(socket.id);
       if (user?.projectId) {
         socket.to(`project:${user.projectId}`).emit("user_left", { userId, name: userName, avatarUrl: userAvatarUrl });

@@ -12,5 +12,8 @@
   "devDependencies": {
     "prettier": "^3.8.4",
     "typescript": "~5.9.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["@google/genai", "node-pty", "node-pty-prebuilt-multiarch", "protobufjs"]
   }
 }

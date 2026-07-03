@@ -34,6 +34,7 @@ import {
   Loader2, SendHorizonal, Sparkles, Activity
 } from 'lucide-react';
 import { AIPanel } from '@/components/ai-panel';
+import { TerminalPanel } from '@/components/terminal-panel';
 import { formatDistanceToNow } from 'date-fns';
 
 type OnlineUser = {
@@ -493,10 +494,8 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
                   </div>
                 </TabsContent>
 
-                <TabsContent value="console" className="flex-1 m-0 p-4 font-mono text-sm bg-background">
-                  <div className="text-muted-foreground mb-2">$ npm run dev</div>
-                  <div className="text-primary">Ready in 143ms.</div>
-                  <div className="text-foreground mt-2">Server listening on <span className="underline">http://localhost:3000</span></div>
+                <TabsContent value="console" className="flex-1 m-0 data-[state=active]:flex flex-col min-h-0 bg-[#09090b]">
+                  <TerminalPanel socket={socket} projectId={pId} />
                 </TabsContent>
 
                 <TabsContent value="problems" className="flex-1 m-0 p-4 bg-background">

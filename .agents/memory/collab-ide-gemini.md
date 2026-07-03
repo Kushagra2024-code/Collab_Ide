@@ -17,6 +17,13 @@ Both `lib/integrations-gemini-ai/src/client.ts` and `lib/integrations-gemini-ai/
 
 **Why:** The api-server bundles into a single ESM file via esbuild. Externalized packages must be resolvable at runtime in `node_modules`. `@google/genai` lives in `lib/integrations-gemini-ai/node_modules` and is not hoisted to the top-level, so Node.js cannot find it unless it's bundled.
 
+## Terminal Implementation
+- node-pty (and node-pty-prebuilt-multiarch) cannot be compiled in this Replit environment — no Python, make, or g++ available.
+- Terminal is implemented via `child_process.spawn('bash', ['--norc'])` with pipe-based I/O — handles all standard shell commands; raw-TUI programs (vim, top) excluded.
+- Frontend uses `@xterm/xterm` + `@xterm/addon-fit` + `@xterm/addon-web-links` for rendering.
+- Each socket creates isolated terminal sessions keyed by `${socketId}:${termId}`.
+- Project working directory is `/tmp/collab-ide-terminals/project-${projectId}` (auto-created).
+
 ## Workflow Commands
 Services need PORT set inline in the workflow command (shared env var conflicts between api and frontend):
 - API Server: `PORT=8080 pnpm --filter @workspace/api-server run dev`
