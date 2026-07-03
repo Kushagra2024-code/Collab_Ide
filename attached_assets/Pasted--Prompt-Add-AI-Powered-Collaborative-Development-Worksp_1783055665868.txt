@@ -1,0 +1,378 @@
+# Prompt: Add AI-Powered Collaborative Development Workspace
+
+I already have a collaborative coding platform. Extend the existing project by adding the following features without breaking the current architecture. Keep the code modular, scalable, secure, and production-ready.
+
+## 1. Collaborative File Explorer
+
+Implement a complete project file management system.
+
+Features:
+
+* Tree-based file and folder explorer.
+* Create, rename, move, copy, delete files and folders.
+* Drag-and-drop support.
+* Upload and download files.
+* Search files.
+* Recent files.
+* Favorite files.
+* File icons based on extension.
+* File history.
+* Auto refresh when another user changes files.
+* Permission-aware operations.
+
+---
+
+## 2. Real-Time Collaboration
+
+Support multiple users working simultaneously.
+
+Features:
+
+* Live collaborative editing.
+* Cursor positions for every user.
+* User selections.
+* User presence indicators.
+* Who is viewing which file.
+* Typing indicators.
+* Conflict-free synchronization (CRDT or Operational Transform).
+* Undo/Redo.
+* Version history.
+* Activity timeline.
+
+---
+
+## 3. Project Permissions
+
+Create a role-based permission system.
+
+Roles:
+
+* Owner
+* Admin
+* Editor
+* Viewer
+
+Permissions:
+
+* Read
+* Write
+* Delete
+* Rename
+* Terminal Access
+* Run Project
+* Manage Environment Variables
+* Install Packages
+* Invite Users
+* Remove Users
+
+Support project invitations via email or share links.
+
+---
+
+## 4. Shared Terminal
+
+Every authorized user should be able to access the project's terminal.
+
+Features:
+
+* Browser-based Linux terminal.
+* Multiple terminal sessions.
+* Shared collaborative terminal.
+* Private terminal option.
+* Terminal history.
+* Resize support.
+* Copy/Paste.
+* Keyboard shortcuts.
+* Persistent sessions.
+* Reconnect after disconnect.
+* Multiple shells.
+* Execute Linux commands.
+* Git commands.
+* Package installation.
+* Build commands.
+* Debug commands.
+
+Display:
+
+* Which user is currently using the terminal.
+* Terminal activity log.
+
+Security:
+
+* Sandbox every project.
+* Isolated containers (Docker).
+* Resource limits.
+* Command logging.
+* Prevent access outside the project workspace.
+
+---
+
+## 5. Project Runner
+
+Allow users to run projects directly from the browser.
+
+Support:
+
+* C++
+* Python
+* Java
+* JavaScript
+* TypeScript
+* Node.js
+* React
+* Next.js
+* Express
+* Spring Boot
+* Go
+* Rust
+
+Features:
+
+* Run
+* Stop
+* Restart
+* Live console output
+* Error logs
+* Build logs
+* Port forwarding
+* Preview window
+* Background processes
+* Hot reload where supported
+
+---
+
+## 6. Problem Workspace
+
+Add an Online Judge style workspace.
+
+Features:
+
+* Problem statement panel.
+* Constraints.
+* Examples.
+* Notes.
+* Custom test cases.
+* Run against custom input.
+* Hidden tests.
+* Verdict.
+* Execution time.
+* Memory usage.
+* Submission history.
+* Code templates.
+* Supported languages.
+* Discussion section.
+
+---
+
+## 7. Team Chat
+
+Real-time project chat.
+
+Features:
+
+* Channels.
+* Direct messages.
+* Threads.
+* Mentions.
+* Emoji reactions.
+* File sharing.
+* Code snippets with syntax highlighting.
+* Image sharing.
+* Notifications.
+* Search messages.
+* Pin important messages.
+* Reply to messages.
+* Read receipts.
+* Online status.
+
+---
+
+## 8. AI Coding Agent (Powered by Gemini)
+
+Integrate Google's Gemini model as an AI development assistant that understands the entire project.
+
+The AI should have read access to the complete project and act as an assistant. It must **never make changes automatically**. Every modification requires explicit user approval.
+
+Capabilities:
+
+* Understand the entire codebase.
+* Explain project architecture.
+* Explain files, folders, classes, functions, and APIs.
+* Generate documentation.
+* Summarize modules.
+* Detect bugs.
+* Find unused code.
+* Detect dead code.
+* Suggest refactoring.
+* Improve code quality.
+* Explain compiler/runtime errors.
+* Suggest fixes.
+* Review pull requests.
+* Generate unit tests.
+* Generate integration tests.
+* Explain algorithms.
+* Explain design patterns.
+* Recommend best practices.
+* Generate README sections.
+* Explain database schema.
+* Generate API documentation.
+* Suggest performance improvements.
+* Detect security vulnerabilities.
+* Detect duplicate code.
+* Recommend project structure improvements.
+* Generate SQL queries.
+* Help with Git operations.
+* Generate commit messages.
+* Explain terminal commands.
+* Help configure Docker.
+* Help configure CI/CD.
+* Answer project-specific questions using the current repository context.
+
+Agent behavior:
+
+* Never modify code without user approval.
+* Show a preview/diff before any change.
+* Explain why the change is recommended.
+* Allow the user to accept, reject, or edit the suggestion.
+* Keep a history of AI suggestions.
+* Support conversational memory within the project session.
+* Reference relevant files and line numbers in explanations.
+
+---
+
+## 9. AI Code Modification Workflow
+
+Workflow:
+
+1. User requests a change.
+2. AI analyzes the repository.
+3. AI proposes a solution.
+4. AI displays a diff preview.
+5. User approves or rejects.
+6. Only after approval are changes applied.
+7. Every AI-generated change is logged.
+
+---
+
+## 10. Project Documentation
+
+Automatically generate and maintain:
+
+* README.md
+* API documentation
+* Folder structure documentation
+* Architecture diagrams
+* Dependency graph
+* Database documentation
+* Environment variable documentation
+* Setup instructions
+* Deployment guide
+* Contributor guide
+* Changelog
+
+---
+
+## 11. Activity Dashboard
+
+Track:
+
+* User activity
+* File edits
+* Terminal usage
+* AI interactions
+* Project runs
+* Build history
+* Errors
+* Commits
+* Chat activity
+* Login history
+
+---
+
+## 12. Git Integration
+
+Features:
+
+* Commit
+* Push
+* Pull
+* Branch management
+* Merge
+* Diff viewer
+* Conflict resolution
+* History viewer
+* Pull Request support
+* Commit graph
+
+---
+
+## 13. Notifications
+
+Notify users about:
+
+* File changes
+* Terminal activity
+* Project runs
+* Build completion
+* AI suggestions
+* Chat mentions
+* User joins/leaves
+* Permission changes
+
+---
+
+## 14. Technology Requirements
+
+Frontend:
+
+* React
+* TypeScript
+* Monaco Editor
+* WebSockets
+* Tailwind CSS
+
+Backend:
+
+* Node.js
+* Express/NestJS
+* WebSocket/Socket.IO
+* Docker
+* PostgreSQL
+* Redis
+* JWT Authentication
+
+AI:
+
+* Google Gemini API
+* Repository-aware context retrieval (RAG)
+* Embedding-based code search
+* Function calling/tool use where appropriate
+* Streaming responses
+* Conversation memory per project session
+
+Infrastructure:
+
+* Docker containers per project
+* Reverse proxy
+* Secure sandbox
+* Persistent storage
+* Horizontal scaling
+* Logging
+* Monitoring
+
+---
+
+## 15. Non-Functional Requirements
+
+* Production-ready architecture.
+* Highly scalable.
+* Secure by default.
+* Low-latency collaboration.
+* Optimized for large repositories.
+* Responsive UI.
+* Modular and maintainable codebase.
+* Comprehensive testing.
+* Robust error handling.
+* Comprehensive documentation.
+
+The implementation should integrate seamlessly into the existing project, preserve current functionality, and prioritize extensibility, security, and performance.
