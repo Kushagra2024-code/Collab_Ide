@@ -2,7 +2,8 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useLocation, Link } from 'wouter';
 import { useAuth } from '@/lib/auth';
 import { useSocket, CursorPosition } from '@/hooks/use-socket';
-import { Editor, useMonaco } from '@monaco-editor/react';
+import { Editor, useMonaco, type OnMount } from '@monaco-editor/react';
+import { useCollabCursors } from '@/hooks/use-collab-cursors';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
 import { 
@@ -101,6 +102,19 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
   const [diagnostics, setDiagnostics] = useState<DiagnosticMarker[]>([]);
   const filesRef = useRef(files);
   useEffect(() => { filesRef.current = files; }, [files]);
+
+  // Monaco editor instance — set via onMount so hooks re-run when editor mounts
+  const [editorInstance, setEditorInstance] = useState<Parameters<OnMount>[0] | null>(null);
+  const handleEditorMount: OnMount = (editor) => { setEditorInstance(editor); };
+
+  // Collaborative cursors — send own cursor, render remote carets + name badges
+  useCollabCursors({
+    socket,
+    editor: editorInstance,
+    activeFileId,
+    myUserId: user?.id ?? 0,
+    projectId: pId,
+  });
 
   // Handle Socket Events
   useEffect(() => {
@@ -502,6 +516,7 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
                   language={activeFile?.language || 'javascript'}
                   value={activeFile?.content || ''}
                   onChange={handleEditorChange}
+                  onMount={handleEditorMount}
                   theme="collab-dark"
                   options={{
                     minimap: { enabled: false },
