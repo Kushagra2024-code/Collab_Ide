@@ -31,8 +31,9 @@ import {
   Code2, Play, Users, Settings, Share2, PanelLeftClose, PanelRightClose,
   FileCode2, FileJson, FileText, FolderTree, FilePlus2, FolderPlus,
   MessageSquare, Terminal, AlertCircle, X, ChevronRight, ChevronDown,
-  Loader2, SendHorizonal
+  Loader2, SendHorizonal, Sparkles, Activity
 } from 'lucide-react';
+import { AIPanel } from '@/components/ai-panel';
 import { formatDistanceToNow } from 'date-fns';
 
 type OnlineUser = {
@@ -508,31 +509,47 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
             </div>
           </Panel>
 
-          {/* RIGHT SIDEBAR: Activity */}
+          {/* RIGHT SIDEBAR: AI Assistant + Activity */}
           {rightPanelOpen && (
             <>
               <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors" />
-              <Panel defaultSize={20} minSize={15} maxSize={30} className="bg-card border-l border-border flex flex-col">
-                <div className="h-9 border-b border-border flex items-center px-4 shrink-0">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Activity Timeline</span>
-                </div>
-                <ScrollArea className="flex-1">
-                  <div className="p-4 space-y-6">
-                    {activity?.map((log) => (
-                      <div key={log.id} className="relative pl-4 border-l border-border">
-                        <div className="absolute w-2 h-2 bg-primary rounded-full -left-[5px] top-1.5 shadow-[0_0_8px_rgba(0,255,255,0.5)]" />
-                        <div className="text-sm">
-                          <span className="font-medium">{log.userName}</span>{' '}
-                          <span className="text-muted-foreground">{log.action.toLowerCase()}</span>{' '}
-                          {log.targetName && <span className="font-mono text-xs px-1 bg-secondary rounded">{log.targetName}</span>}
-                        </div>
-                        <div className="text-[10px] text-muted-foreground mt-1 font-mono uppercase">
-                          {formatDistanceToNow(new Date(log.createdAt))} ago
-                        </div>
-                      </div>
-                    ))}
+              <Panel defaultSize={25} minSize={18} maxSize={40} className="bg-card border-l border-border flex flex-col">
+                <Tabs defaultValue="ai" className="h-full flex flex-col">
+                  <div className="h-9 border-b border-border px-3 flex items-center shrink-0">
+                    <TabsList className="h-full bg-transparent p-0 gap-3">
+                      <TabsTrigger value="ai" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 h-full text-xs uppercase tracking-wider flex items-center gap-1.5">
+                        <Sparkles className="w-3 h-3" /> AI
+                      </TabsTrigger>
+                      <TabsTrigger value="activity" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 h-full text-xs uppercase tracking-wider flex items-center gap-1.5">
+                        <Activity className="w-3 h-3" /> Activity
+                      </TabsTrigger>
+                    </TabsList>
                   </div>
-                </ScrollArea>
+
+                  <TabsContent value="ai" className="flex-1 m-0 data-[state=active]:flex flex-col min-h-0">
+                    <AIPanel projectId={pId} />
+                  </TabsContent>
+
+                  <TabsContent value="activity" className="flex-1 m-0 data-[state=active]:flex flex-col min-h-0 overflow-hidden">
+                    <ScrollArea className="flex-1">
+                      <div className="p-4 space-y-6">
+                        {activity?.map((log) => (
+                          <div key={log.id} className="relative pl-4 border-l border-border">
+                            <div className="absolute w-2 h-2 bg-primary rounded-full -left-[5px] top-1.5 shadow-[0_0_8px_rgba(0,255,255,0.5)]" />
+                            <div className="text-sm">
+                              <span className="font-medium">{log.userName}</span>{' '}
+                              <span className="text-muted-foreground">{log.action.toLowerCase()}</span>{' '}
+                              {log.targetName && <span className="font-mono text-xs px-1 bg-secondary rounded">{log.targetName}</span>}
+                            </div>
+                            <div className="text-[10px] text-muted-foreground mt-1 font-mono uppercase">
+                              {formatDistanceToNow(new Date(log.createdAt))} ago
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  </TabsContent>
+                </Tabs>
               </Panel>
             </>
           )}

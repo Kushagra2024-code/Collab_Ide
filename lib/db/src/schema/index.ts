@@ -6,3 +6,5 @@ export * from "./fileVersions";
 export * from "./activityLogs";
 export * from "./chatMessages";
 export * from "./notifications";
+export * from "./conversations";
+export * from "./messages";

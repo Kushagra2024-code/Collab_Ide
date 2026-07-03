@@ -8,6 +8,7 @@ import activityRouter from "./activity";
 import messagesRouter from "./messages";
 import notificationsRouter from "./notifications";
 import dashboardRouter from "./dashboard";
+import geminiRouter from "./gemini";
 
 const router: IRouter = Router();
 
@@ -20,5 +21,6 @@ router.use(activityRouter);
 router.use(messagesRouter);
 router.use(notificationsRouter);
 router.use(dashboardRouter);
+router.use(geminiRouter);
 
 export default router;

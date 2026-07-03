@@ -1,2 +1,3 @@
 - [CollabIDE stack decisions](collab-ide-stack.md) — Node/Express/Drizzle/Socket.io/React+Monaco; JWT via SESSION_SECRET env var (no fallback).
 - [CollabIDE security patterns](collab-ide-security.md) — requireProjectMember middleware + socket room-gating pattern to use for any new project-scoped endpoint/event.
+- [CollabIDE Gemini AI integration](collab-ide-gemini.md) — User-supplied GEMINI_API_KEY; template client files needed patching; @google/* must NOT be in esbuild externals; image client also had proxy guards requiring the same fix.
