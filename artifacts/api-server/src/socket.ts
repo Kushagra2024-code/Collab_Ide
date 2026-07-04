@@ -286,7 +286,7 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
         if (!proc) {
           try {
             // eslint-disable-next-line @typescript-eslint/no-var-requires
-            const pty = await import('node-pty');
+            const pty = await import('node-pty-prebuilt-multiarch');
             const cwd = getProjectWorkdir(String(projectId));
             proc = pty.spawn('bash', ['--norc', '--noprofile'], {
               name: 'xterm-256color',
