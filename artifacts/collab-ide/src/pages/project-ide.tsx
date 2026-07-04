@@ -37,7 +37,7 @@ import {
   Loader2, SendHorizonal, Sparkles, Activity
 } from 'lucide-react';
 import { AIPanel } from '@/components/ai-panel';
-import { TerminalPanel } from '@/components/terminal-panel';
+import { TerminalPanel, TerminalPanelHandle } from '@/components/terminal-panel';
 import FileExplorer from '@/components/file-explorer';
 import { formatDistanceToNow } from 'date-fns';
 
@@ -46,6 +46,38 @@ type OnlineUser = {
   userName: string;
   avatarUrl?: string | null;
 };
+
+/** Derive a shell command to run the project given its language. */
+function getRunCommand(language: string | null | undefined, files?: { name: string }[]): string | null {
+  const lang = (language ?? '').toLowerCase();
+  const fileNames = files?.map(f => f.name) ?? [];
+
+  if (fileNames.includes('package.json')) {
+    return 'npm start';
+  }
+  if (lang.includes('python') || fileNames.some(f => f === 'main.py' || f === 'app.py')) {
+    const entry = fileNames.find(f => f === 'main.py') ?? fileNames.find(f => f === 'app.py') ?? 'main.py';
+    return `python3 ${entry}`;
+  }
+  if (lang.includes('go') || fileNames.includes('go.mod')) return 'go run .';
+  if (lang.includes('rust') || fileNames.includes('Cargo.toml')) return 'cargo run';
+  if (lang.includes('ruby') || fileNames.some(f => f.endsWith('.rb'))) {
+    const entry = fileNames.find(f => f === 'main.rb') ?? fileNames.find(f => f.endsWith('.rb'));
+    return entry ? `ruby ${entry}` : null;
+  }
+  if (lang.includes('java') || fileNames.some(f => f.endsWith('.java'))) return 'javac *.java && java Main';
+  if (lang.includes('javascript') || lang.includes('node') || fileNames.some(f => f === 'index.js')) {
+    const entry = fileNames.find(f => f === 'index.js') ?? fileNames.find(f => f === 'main.js') ?? 'index.js';
+    return `node ${entry}`;
+  }
+  if (lang.includes('typescript') || fileNames.some(f => f === 'index.ts' || f === 'main.ts')) {
+    const entry = fileNames.find(f => f === 'index.ts') ?? fileNames.find(f => f === 'main.ts') ?? 'index.ts';
+    return `npx ts-node ${entry}`;
+  }
+  if (lang.includes('c++') || lang.includes('cpp')) return 'g++ -o main *.cpp && ./main';
+  if (lang.includes('c') || fileNames.some(f => f.endsWith('.c'))) return 'gcc -o main *.c && ./main';
+  return null;
+}
 
 export default function ProjectIDE({ projectId }: { projectId: string }) {
   const pId = parseInt(projectId, 10);
@@ -62,6 +94,10 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
   // Layout states
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
+
+  // Bottom panel tab state (allows Run button to switch to Terminal)
+  const [activeBottomTab, setActiveBottomTab] = useState('chat');
+  const terminalPanelRef = useRef<TerminalPanelHandle>(null);
   
   // API Queries
   const { data: project, isLoading: projectLoading } = useGetProject(pId);
@@ -408,7 +444,21 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
             </div>
           )}
           
-          <Button variant="outline" size="sm" className="h-8 gap-2 bg-background hidden sm:flex">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-8 gap-2 bg-background hidden sm:flex text-emerald-400 border-emerald-900 hover:bg-emerald-950 hover:border-emerald-700"
+            onClick={() => {
+              const cmd = getRunCommand(project?.language, files ?? []);
+              if (!cmd) {
+                setActiveBottomTab('console');
+                return;
+              }
+              setActiveBottomTab('console');
+              // Small delay so the tab renders before we inject the command
+              setTimeout(() => terminalPanelRef.current?.runCommand(cmd, 'run'), 50);
+            }}
+          >
             <Play className="w-3.5 h-3.5" /> Run
           </Button>
           
@@ -511,7 +561,7 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
 
             {/* BOTTOM PANEL */}
             <div className="h-64 border-t border-border bg-card flex flex-col shrink-0">
-              <Tabs defaultValue="chat" className="h-full flex flex-col">
+              <Tabs value={activeBottomTab} onValueChange={setActiveBottomTab} className="h-full flex flex-col">
                 <div className="h-9 border-b border-border px-4 flex items-center justify-between">
                   <TabsList className="h-full bg-transparent p-0 gap-4">
                     <TabsTrigger value="chat" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 h-full text-xs uppercase tracking-wider">
@@ -573,7 +623,7 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
                 </TabsContent>
 
                 <TabsContent value="console" className="flex-1 m-0 data-[state=active]:flex flex-col min-h-0 bg-[#09090b]">
-                  <TerminalPanel socket={socket} projectId={pId} />
+                  <TerminalPanel ref={terminalPanelRef} socket={socket} projectId={pId} />
                 </TabsContent>
 
                 <TabsContent value="problems" className="flex-1 m-0 data-[state=active]:flex flex-col min-h-0 bg-background">

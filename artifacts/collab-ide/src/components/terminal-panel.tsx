@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, forwardRef, useImperativeHandle } from 'react';
 import { Terminal as XTerm } from '@xterm/xterm';
 import { FitAddon } from '@xterm/addon-fit';
 import { WebLinksAddon } from '@xterm/addon-web-links';
@@ -15,6 +15,11 @@ interface TerminalTab {
   exited: boolean;
 }
 
+export interface TerminalPanelHandle {
+  /** Create a new terminal tab, send a command, and switch to it. */
+  runCommand: (command: string, label?: string) => void;
+}
+
 interface TerminalPanelProps {
   socket: Socket | null;
   projectId: number | string;
@@ -26,7 +31,8 @@ function makeTermId(): string {
   return `term-${++termCounter}-${Date.now()}`;
 }
 
-export function TerminalPanel({ socket, projectId }: TerminalPanelProps) {
+export const TerminalPanel = forwardRef<TerminalPanelHandle, TerminalPanelProps>(
+function TerminalPanel({ socket, projectId }, ref) {
   const [tabs, setTabs] = useState<TerminalTab[]>([]);
   const [activeTabId, setActiveTabId] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -172,6 +178,22 @@ export function TerminalPanel({ socket, projectId }: TerminalPanelProps) {
     });
   }, [socket, activeTabId]);
 
+  // Imperative handle: lets the parent call runCommand(cmd, label)
+  useImperativeHandle(ref, () => ({
+    runCommand(command: string, label = 'run') {
+      if (!socket) return;
+      const termId = makeTermId();
+      const tab: TerminalTab = { id: termId, label, term: null, fitAddon: null, exited: false };
+      setTabs(prev => [...prev, tab]);
+      setActiveTabId(termId);
+      socket.emit('terminal_create', { termId, projectId: String(projectId) });
+      // Give the shell a moment to initialise before sending the command
+      setTimeout(() => {
+        socket.emit('terminal_input', { termId, input: command + '\n', projectId: String(projectId) });
+      }, 300);
+    },
+  }), [socket, projectId]);
+
   // Auto-open first terminal when socket is ready
   useEffect(() => {
     if (socket && tabs.length === 0) {
@@ -256,4 +278,6 @@ export function TerminalPanel({ socket, projectId }: TerminalPanelProps) {
       </div>
     </div>
   );
-}
+});
+
+TerminalPanel.displayName = 'TerminalPanel';
