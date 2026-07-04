@@ -18,7 +18,7 @@ export default function Login() {
     setError('');
     
     try {
-      await loginUser({ email, password });
+      await loginUser({ email: email.trim(), password });
     } catch (err: any) {
       setError(err.message || 'Failed to login');
     } finally {

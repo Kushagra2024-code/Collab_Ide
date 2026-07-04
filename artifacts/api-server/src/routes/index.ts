@@ -9,6 +9,7 @@ import messagesRouter from "./messages";
 import notificationsRouter from "./notifications";
 import dashboardRouter from "./dashboard";
 import geminiRouter from "./gemini";
+import aiWorkflowRouter from "./aiWorkflow";
 
 const router: IRouter = Router();
 
@@ -22,5 +23,6 @@ router.use(messagesRouter);
 router.use(notificationsRouter);
 router.use(dashboardRouter);
 router.use(geminiRouter);
+router.use(aiWorkflowRouter);
 
 export default router;

@@ -4,6 +4,7 @@ import { useAuth } from '@/lib/auth';
 import { useSocket, CursorPosition } from '@/hooks/use-socket';
 import { Editor, useMonaco, type OnMount } from '@monaco-editor/react';
 import { useCollabCursors } from '@/hooks/use-collab-cursors';
+import { useYjs } from '@/hooks/use-yjs';
 import { Panel, PanelGroup, PanelResizeHandle } from 'react-resizable-panels';
 
 import { 
@@ -37,6 +38,7 @@ import {
 } from 'lucide-react';
 import { AIPanel } from '@/components/ai-panel';
 import { TerminalPanel } from '@/components/terminal-panel';
+import FileExplorer from '@/components/file-explorer';
 import { formatDistanceToNow } from 'date-fns';
 
 type OnlineUser = {
@@ -115,6 +117,9 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
     myUserId: user?.id ?? 0,
     projectId: pId,
   });
+
+  // Optional Yjs sync (best-effort)
+  useYjs({ projectId: pId, fileId: activeFileId, editor: editorInstance });
 
   // Handle Socket Events
   useEffect(() => {
@@ -439,44 +444,7 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
                 </div>
                 
                 <ScrollArea className="flex-1">
-                  <div className="p-2 space-y-0.5">
-                    {isCreatingFile && (
-                      <form onSubmit={handleCreateFileSubmit} className="flex items-center gap-2 px-2 py-1">
-                        <FileText className="w-4 h-4 text-muted-foreground shrink-0" />
-                        <Input 
-                          autoFocus
-                          value={newFileName}
-                          onChange={e => setNewFileName(e.target.value)}
-                          onBlur={() => setIsCreatingFile(false)}
-                          className="h-6 text-xs bg-background rounded-sm px-1.5 font-mono"
-                          placeholder="filename.ts"
-                        />
-                      </form>
-                    )}
-                    
-                    {tree.map(file => {
-                      const fileErrors = diagnostics.filter(d => d.fileId === file.id && d.severity === 8).length;
-                      const fileWarnings = diagnostics.filter(d => d.fileId === file.id && d.severity === 4).length;
-                      return (
-                        <div 
-                          key={file.id} 
-                          onClick={() => handleOpenFile(file)}
-                          className={`flex items-center gap-2 px-2 py-1 text-sm cursor-pointer rounded-md transition-colors ${
-                            activeFileId === file.id ? 'bg-primary/20 text-primary font-medium' : 'text-muted-foreground hover:bg-secondary hover:text-foreground'
-                          }`}
-                        >
-                          {getFileIcon(file)}
-                          <span className="truncate font-mono text-xs flex-1">{file.name}</span>
-                          {fileErrors > 0 && (
-                            <span className="text-[9px] font-bold text-destructive bg-destructive/10 rounded px-1 shrink-0">{fileErrors}</span>
-                          )}
-                          {fileErrors === 0 && fileWarnings > 0 && (
-                            <span className="text-[9px] font-bold text-yellow-500 bg-yellow-500/10 rounded px-1 shrink-0">{fileWarnings}</span>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <FileExplorer projectId={pId} files={files} activeFileId={activeFileId} onOpenFile={handleOpenFile} onCloseFile={handleCloseFile} diagnostics={diagnostics} />
                 </ScrollArea>
               </Panel>
               <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors" />

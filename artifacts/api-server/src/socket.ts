@@ -1,6 +1,7 @@
 import { Server as HttpServer } from "http";
 import { Server as SocketIOServer } from "socket.io";
 import { spawn, ChildProcessWithoutNullStreams } from "child_process";
+import { ensureContainer, execInContainer, getContainerName } from "./dockerSandbox";
 import { mkdirSync, existsSync } from "fs";
 import path from "path";
 import os from "os";
@@ -11,11 +12,14 @@ import { logger } from "./lib/logger";
 
 // ── Terminal session management ────────────────────────────────────────────
 interface TerminalSession {
-  process: ChildProcessWithoutNullStreams;
+  process: any; // supports node-pty or ChildProcess
   projectId: string;
+  subscribers: Set<string>; // socket ids
+  containerName?: string | null;
+  isPty?: boolean;
 }
 
-const terminalSessions = new Map<string, TerminalSession>(); // key: `${socketId}:${termId}`
+const terminalSessions = new Map<string, TerminalSession>(); // key: `${projectId}:${termId}`
 
 function getProjectWorkdir(projectId: string): string {
   const dir = path.join(os.tmpdir(), "collab-ide-terminals", `project-${projectId}`);
@@ -49,6 +53,10 @@ const connectedUsers = new Map<string, ConnectedUser>();
 
 // Per-user socket tracking — allows server-side push to a specific user
 const userSockets = new Map<number, Set<string>>();
+ 
+// Simple in-memory store for collaborative document updates (lightweight relay).
+// Keys: `projectId:fileId` -> array of base64-encoded updates (strings)
+const collabDocUpdates = new Map<string, string[]>();
 
 let _io: SocketIOServer | null = null;
 
@@ -177,6 +185,36 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
       socket.to(`project:${projectId}`).emit("code_change", { projectId, fileId, content, userId, userName });
     });
 
+    // CRDT/OT relay hooks (lightweight): clients may send binary updates (base64)
+    // Server stores recent updates for late-joiners and relays to other sockets.
+    socket.on("yjs_update", (data: unknown) => {
+      if (typeof data !== "object" || data === null) return;
+      const { projectId, fileId, update } = data as any;
+      if (!isInRoom(String(projectId))) return;
+      if (!update) return;
+
+      const key = `${projectId}:${fileId}`;
+      const arr = collabDocUpdates.get(key) ?? [];
+      // keep small history (last 50 updates)
+      arr.push(String(update));
+      if (arr.length > 50) arr.shift();
+      collabDocUpdates.set(key, arr);
+
+      // Broadcast binary update to other clients in project room
+      socket.to(`project:${projectId}`).emit("yjs_update", { projectId, fileId, update, userId, userName });
+    });
+
+    // Client requests the accumulated updates for a doc (late joiner)
+    socket.on("request_file_doc", (data: unknown) => {
+      if (typeof data !== "object" || data === null) return;
+      const { projectId, fileId } = data as any;
+      if (!isInRoom(String(projectId))) return;
+      const key = `${projectId}:${fileId}`;
+      const arr = collabDocUpdates.get(key) ?? [];
+      if (arr.length === 0) return;
+      socket.emit("file_doc", { projectId, fileId, updates: arr });
+    });
+
     // Cursor moves are throttled per socket to 20 fps (50ms) to avoid flooding
     const cursorLastEmit = new Map<string, number>();
 
@@ -219,55 +257,135 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
     });
 
     // ── Terminal events ──────────────────────────────────────────────────────
-    socket.on("terminal_create", (data: unknown) => {
+    socket.on("terminal_create", async (data: unknown) => {
       if (typeof data !== "object" || data === null || !("termId" in data) || !("projectId" in data)) return;
-      const { termId, projectId } = data as { termId: string; projectId: string };
+      const { termId, projectId, cols = 80, rows = 24 } = data as { termId: string; projectId: string; cols?: number; rows?: number };
       if (!isInRoom(String(projectId))) return;
 
-      const sessionKey = `${socket.id}:${termId}`;
-      if (terminalSessions.has(sessionKey)) return; // already exists
+      const sessionKey = `${projectId}:${termId}`;
+      // Join the socket to a dedicated terminal room so outputs can be scoped
+      const room = `term:${projectId}:${termId}`;
+      socket.join(room);
 
-      const cwd = getProjectWorkdir(String(projectId));
-      const proc = spawnShell(cwd);
+      let session = terminalSessions.get(sessionKey);
+      if (!session) {
+        // Create new session (try node-pty for proper terminal behavior)
+        let proc: any = null;
+        let isPty = false;
+        const useDocker = process.env.SANDBOX_DOCKER === 'true';
 
-      proc.stdout.on("data", (chunk: Buffer) => {
-        socket.emit("terminal_output", { termId, data: chunk.toString("utf8") });
-      });
-      proc.stderr.on("data", (chunk: Buffer) => {
-        socket.emit("terminal_output", { termId, data: chunk.toString("utf8") });
-      });
-      proc.on("close", (code) => {
-        socket.emit("terminal_exit", { termId, code });
-        terminalSessions.delete(sessionKey);
-      });
+        if (useDocker) {
+          const container = ensureContainer(projectId);
+          if (container) {
+            proc = execInContainer(container, ["bash", "--norc", "--noprofile"] as string[]);
+            // execInContainer may not be a PTY-backed process; treat as non-pty
+            isPty = false;
+          }
+        }
 
-      terminalSessions.set(sessionKey, { process: proc, projectId: String(projectId) });
+        if (!proc) {
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-var-requires
+            const pty = await import('node-pty');
+            const cwd = getProjectWorkdir(String(projectId));
+            proc = pty.spawn('bash', ['--norc', '--noprofile'], {
+              name: 'xterm-256color',
+              cwd,
+              cols,
+              rows,
+              env: {
+                ...process.env,
+                TERM: 'xterm-256color',
+                COLORTERM: 'truecolor',
+                PS1: "\\u@collab-ide:\\w\\$ ",
+                FORCE_COLOR: '1',
+              }
+            });
+            isPty = true;
+          } catch (e) {
+            // node-pty not available; fallback to spawn
+            const cwd = getProjectWorkdir(String(projectId));
+            proc = spawnShell(cwd);
+            isPty = false;
+          }
+        }
 
-      // Send initial prompt trigger
-      proc.stdin.write("PS1='\\u@collab-ide:\\w\\$ '; export PS1; echo\n");
+        session = { process: proc, projectId: String(projectId), subscribers: new Set<string>(), isPty, containerName: null };
+
+        // Attach process data handlers
+        if (session.isPty && session.process.on) {
+          session.process.on('data', (chunk: string | Buffer) => {
+            _io?.to(room).emit('terminal_output', { termId, data: String(chunk) });
+          });
+        } else {
+          // child_process streams
+          session.process.stdout?.on?.('data', (chunk: Buffer) => {
+            _io?.to(room).emit('terminal_output', { termId, data: chunk.toString('utf8') });
+          });
+          session.process.stderr?.on?.('data', (chunk: Buffer) => {
+            _io?.to(room).emit('terminal_output', { termId, data: chunk.toString('utf8') });
+          });
+          session.process.on?.('close', (code: number) => {
+            _io?.to(room).emit('terminal_exit', { termId, code });
+            terminalSessions.delete(sessionKey);
+          });
+        }
+
+        terminalSessions.set(sessionKey, session);
+
+        // Send initial prompt trigger for non-PTY shells; PTY usually initializes prompt itself
+        if (!session.isPty) {
+          try { session.process.stdin.write("PS1='\\u@collab-ide:\\w\\$ '; export PS1; echo\n"); } catch {}
+        }
+      }
+
+      // Register subscriber
+      session.subscribers.add(socket.id);
     });
 
     socket.on("terminal_input", (data: unknown) => {
-      if (typeof data !== "object" || data === null || !("termId" in data) || !("input" in data)) return;
-      const { termId, input } = data as { termId: string; input: string };
-      const session = terminalSessions.get(`${socket.id}:${termId}`);
-      if (!session || session.process.killed) return;
-      session.process.stdin.write(input);
+      if (typeof data !== "object" || data === null || !("termId" in data) || !("input" in data) || !("projectId" in data)) return;
+      const { termId, input, projectId } = data as { termId: string; input: string; projectId: string };
+      const session = terminalSessions.get(`${projectId}:${termId}`);
+      if (!session) return;
+      try {
+        if (session.isPty && session.process.write) {
+          session.process.write(input);
+        } else if (session.process.stdin && session.process.stdin.write) {
+          session.process.stdin.write(input);
+        }
+      } catch (e) {
+        logger.error({ err: e }, 'terminal_input write failed');
+      }
     });
 
     socket.on("terminal_resize", (data: unknown) => {
-      // No-op without PTY — resize info is tracked client-side by xterm
-      void data;
+      if (typeof data !== "object" || data === null || !("termId" in data) || !("projectId" in data)) return;
+      const { termId, cols, rows, projectId } = data as { termId: string; cols?: number; rows?: number; projectId: string };
+      const session = terminalSessions.get(`${projectId}:${termId}`);
+      if (!session) return;
+      try {
+        if (session.isPty && session.process.resize) {
+          session.process.resize(cols ?? 80, rows ?? 24);
+        }
+      } catch (e) {
+        logger.debug({ err: e }, 'terminal resize failed or not supported');
+      }
     });
 
     socket.on("terminal_close", (data: unknown) => {
-      if (typeof data !== "object" || data === null || !("termId" in data)) return;
-      const { termId } = data as { termId: string };
-      const sessionKey = `${socket.id}:${termId}`;
+      if (typeof data !== "object" || data === null || !("termId" in data) || !("projectId" in data)) return;
+      const { termId, projectId } = data as { termId: string; projectId: string };
+      const sessionKey = `${projectId}:${termId}`;
       const session = terminalSessions.get(sessionKey);
       if (session) {
-        session.process.kill("SIGTERM");
-        terminalSessions.delete(sessionKey);
+        // remove this subscriber
+        session.subscribers.delete(socket.id);
+        socket.leave(`term:${projectId}:${termId}`);
+        if (session.subscribers.size === 0) {
+          try { session.process.kill?.('SIGTERM'); } catch {}
+          terminalSessions.delete(sessionKey);
+        }
       }
     });
 

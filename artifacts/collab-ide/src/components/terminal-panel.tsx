@@ -112,7 +112,7 @@ export function TerminalPanel({ socket, projectId }: TerminalPanelProps) {
 
     // Send user keystrokes to the server
     term.onData((data) => {
-      socket?.emit('terminal_input', { termId, input: data });
+      socket?.emit('terminal_input', { termId, input: data, projectId: String(projectId) });
     });
 
     xtermInstances.current.set(termId, { term, fit });
@@ -145,7 +145,7 @@ export function TerminalPanel({ socket, projectId }: TerminalPanelProps) {
   const restartTab = useCallback((termId: string) => {
     if (!socket) return;
     // Close old shell
-    socket.emit('terminal_close', { termId });
+    socket.emit('terminal_close', { termId, projectId: String(projectId) });
     // Clear the terminal
     const inst = xtermInstances.current.get(termId);
     if (inst) inst.term.clear();
@@ -156,7 +156,7 @@ export function TerminalPanel({ socket, projectId }: TerminalPanelProps) {
 
   // Close a terminal tab
   const closeTab = useCallback((termId: string) => {
-    socket?.emit('terminal_close', { termId });
+    socket?.emit('terminal_close', { termId, projectId: String(projectId) });
     const inst = xtermInstances.current.get(termId);
     if (inst) {
       inst.term.dispose();
@@ -184,7 +184,7 @@ export function TerminalPanel({ socket, projectId }: TerminalPanelProps) {
     return () => {
       for (const [termId, inst] of xtermInstances.current) {
         inst.term.dispose();
-        socket?.emit('terminal_close', { termId });
+        socket?.emit('terminal_close', { termId, projectId: String(projectId) });
       }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps

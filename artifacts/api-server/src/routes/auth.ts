@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
 import bcrypt from "bcryptjs";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, usersTable } from "@workspace/db";
 import { signToken } from "../lib/auth";
+import { normalizeEmail } from "../lib/email";
 import { requireAuth } from "../middlewares/auth";
 import {
   RegisterBody,
@@ -14,15 +15,30 @@ import {
 
 const router: IRouter = Router();
 
+function getTestLoginAllowlist(): Set<string> {
+  const raw = process.env.TEST_LOGIN_EMAILS ?? "";
+  return new Set(
+    raw
+      .split(",")
+      .map((email) => normalizeEmail(email))
+      .filter(Boolean),
+  );
+}
+
+function isTestLoginEnabled(email: string): boolean {
+  return process.env.NODE_ENV !== "production" && getTestLoginAllowlist().has(normalizeEmail(email));
+}
+
 router.post("/auth/register", async (req, res): Promise<void> => {
   const parsed = RegisterBody.safeParse(req.body);
   if (!parsed.success) {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { name, email, password, avatarUrl } = parsed.data;
+  const { name, password, avatarUrl } = parsed.data;
+  const email = normalizeEmail(parsed.data.email);
 
-  const existing = await db.select().from(usersTable).where(eq(usersTable.email, email));
+  const existing = await db.select().from(usersTable).where(sql`lower(${usersTable.email}) = ${email}`);
   if (existing.length > 0) {
     res.status(400).json({ error: "Email already in use" });
     return;
@@ -46,18 +62,32 @@ router.post("/auth/login", async (req, res): Promise<void> => {
     res.status(400).json({ error: parsed.error.message });
     return;
   }
-  const { email, password } = parsed.data;
+  const email = normalizeEmail(parsed.data.email);
+  const { password } = parsed.data;
 
-  const [user] = await db.select().from(usersTable).where(eq(usersTable.email, email));
+  let [user] = await db.select().from(usersTable).where(sql`lower(${usersTable.email}) = ${email}`);
+
+  if (!user && isTestLoginEnabled(email)) {
+    const passwordHash = await bcrypt.hash(`test-login:${email}`, 4);
+    [user] = await db.insert(usersTable).values({
+      name: email.split("@")[0] || email,
+      email,
+      passwordHash,
+      avatarUrl: null,
+    }).returning();
+  }
+
   if (!user) {
     res.status(401).json({ error: "Invalid credentials" });
     return;
   }
 
-  const valid = await bcrypt.compare(password, user.passwordHash);
-  if (!valid) {
-    res.status(401).json({ error: "Invalid credentials" });
-    return;
+  if (!isTestLoginEnabled(email)) {
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      res.status(401).json({ error: "Invalid credentials" });
+      return;
+    }
   }
 
   const token = signToken({ userId: user.id, email: user.email });

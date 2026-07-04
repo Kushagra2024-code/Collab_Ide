@@ -19,7 +19,7 @@ export default function Register() {
     setError('');
     
     try {
-      await registerUser({ name, email, password });
+      await registerUser({ name, email: email.trim(), password });
     } catch (err: any) {
       setError(err.message || 'Failed to create account');
     } finally {

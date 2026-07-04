@@ -255,4 +255,25 @@ router.post(
   }
 );
 
+// Download raw file contents
+router.get(
+  "/projects/:projectId/files/:fileId/download",
+  requireAuth,
+  requireProjectMember(true),
+  async (req, res): Promise<void> => {
+    const params = GetFileParams.safeParse(req.params);
+    if (!params.success) { res.status(400).json({ error: params.error.message }); return; }
+
+    const [file] = await db.select().from(projectFilesTable).where(
+      and(eq(projectFilesTable.id, params.data.fileId), eq(projectFilesTable.projectId, params.data.projectId))
+    );
+    if (!file) { res.status(404).json({ error: "File not found" }); return; }
+
+    const filename = file.name || `file-${file.id}`;
+    res.setHeader("Content-Disposition", `attachment; filename="${filename}"`);
+    res.setHeader("Content-Type", "application/octet-stream");
+    res.send(file.content ?? "");
+  }
+);
+
 export default router;

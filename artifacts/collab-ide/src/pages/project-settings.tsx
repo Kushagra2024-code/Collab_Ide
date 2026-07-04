@@ -102,11 +102,12 @@ export default function ProjectSettings({ projectId }: { projectId: string }) {
 
   const handleInvite = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!inviteEmail) return;
+    const trimmedEmail = inviteEmail.trim();
+    if (!trimmedEmail) return;
     
     inviteMember.mutate({
       projectId: pId,
-      data: { email: inviteEmail, role: inviteRole }
+      data: { email: trimmedEmail, role: inviteRole }
     }, {
       onSuccess: () => {
         toast({ title: "Invite sent" });

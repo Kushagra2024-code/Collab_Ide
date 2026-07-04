@@ -3,6 +3,7 @@ import { eq, and, or, sql, desc } from "drizzle-orm";
 import { db, projectsTable, projectMembersTable, usersTable, activityLogsTable, chatMessagesTable, projectFilesTable, fileVersionsTable, notificationsTable } from "@workspace/db";
 import { requireAuth } from "../middlewares/auth";
 import { emitToUser } from "../socket";
+import { normalizeEmail } from "../lib/email";
 import {
   ListProjectsQueryParams,
   ListProjectsResponse,
@@ -260,7 +261,8 @@ router.post("/projects/:projectId/invite", requireAuth, async (req, res): Promis
     return;
   }
 
-  const [targetUser] = await db.select().from(usersTable).where(eq(usersTable.email, body.data.email));
+  const inviteEmail = normalizeEmail(body.data.email);
+  const [targetUser] = await db.select().from(usersTable).where(sql`lower(${usersTable.email}) = ${inviteEmail}`);
   if (!targetUser) {
     res.status(404).json({ error: "User not found" });
     return;
