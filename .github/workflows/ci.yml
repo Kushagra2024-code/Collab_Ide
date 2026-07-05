@@ -27,8 +27,11 @@ jobs:
       - name: Install Dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build Libraries (api-zod, db, integrations)
+      - name: Build Libraries and Workspace Packages
         run: pnpm -r --if-present run build
+        env:
+          PORT: 3000
+          BASE_PATH: /
         
       - name: Build TypeScript Project References
         run: npx tsc -b
