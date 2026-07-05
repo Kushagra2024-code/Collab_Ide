@@ -1,0 +1,26 @@
+services:
+  - type: web
+    name: collabide-backend
+    env: node
+    plan: free
+    region: ohio
+    buildCommand: pnpm install --frozen-lockfile && pnpm -r --if-present run build && pnpm --filter @workspace/api-server run build
+    startCommand: pnpm --filter @workspace/api-server run start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: DATABASE_URL
+        fromDatabase:
+          name: collabide-db
+          property: connectionString
+      - key: GEMINI_API_KEY
+        sync: false # You must set this in the Render Dashboard manually
+
+databases:
+  - name: collabide-db
+    plan: free
+    region: ohio
+    databaseName: collabide
+    user: collabide
