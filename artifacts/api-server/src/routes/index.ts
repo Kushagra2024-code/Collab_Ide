@@ -10,6 +10,11 @@ import notificationsRouter from "./notifications";
 import dashboardRouter from "./dashboard";
 import geminiRouter from "./gemini";
 import aiWorkflowRouter from "./aiWorkflow";
+import permissionsRouter from "./permissions";
+import gitRouter from "./git";
+import runnerRouter from "./runner";
+import problemsRouter from "./problems";
+import documentationRouter from "./documentation";
 
 const router: IRouter = Router();
 
@@ -24,5 +29,10 @@ router.use(notificationsRouter);
 router.use(dashboardRouter);
 router.use(geminiRouter);
 router.use(aiWorkflowRouter);
+router.use(permissionsRouter);
+router.use(gitRouter);
+router.use(runnerRouter);
+router.use(problemsRouter);
+router.use(documentationRouter);
 
 export default router;

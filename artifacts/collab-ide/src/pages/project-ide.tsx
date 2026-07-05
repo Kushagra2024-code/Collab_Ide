@@ -34,11 +34,16 @@ import {
   FileCode2, FileJson, FileText, FolderTree, FilePlus2, FolderPlus,
   MessageSquare, Terminal, AlertCircle, XCircle, AlertTriangle, Info,
   CheckCircle, X, ChevronRight, ChevronDown,
-  Loader2, SendHorizonal, Sparkles, Activity
+  Loader2, SendHorizonal, Sparkles, Activity, GitBranch, Gavel, BookOpen
 } from 'lucide-react';
 import { AIPanel } from '@/components/ai-panel';
 import { TerminalPanel, TerminalPanelHandle } from '@/components/terminal-panel';
 import FileExplorer from '@/components/file-explorer';
+import { GitPanel } from '@/components/git-panel';
+import { RunnerPanel } from '@/components/runner-panel';
+import { ProblemWorkspace } from '@/components/problem-workspace';
+import { AiSuggestionsPanel } from '@/components/ai-suggestions-panel';
+import { FileHistoryPanel } from '@/components/file-history-panel';
 import { formatDistanceToNow } from 'date-fns';
 
 type OnlineUser = {
@@ -124,6 +129,10 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
   // File system state
   const [isCreatingFile, setIsCreatingFile] = useState(false);
   const [newFileName, setNewFileName] = useState('');
+  const [historyFileId, setHistoryFileId] = useState<number | null>(null);
+  const [typingUsers, setTypingUsers] = useState<Set<number>>(new Set());
+  const [fileViewers, setFileViewers] = useState<Record<number, string[]>>({});
+  const [leftSidebarTab, setLeftSidebarTab] = useState<'files' | 'git'>('files');
 
   const activeFile = useMemo(() => files?.find(f => f.id === activeFileId), [files, activeFileId]);
 
@@ -204,21 +213,51 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
     };
 
     const onFileDeleted = ({ fileId }: { fileId: number; projectId: number }) => {
-      // Remove from React Query cache immediately — no round-trip needed
       queryClient.setQueryData(
         getListFilesQueryKey(pId),
         (old: any[] | undefined) => old?.filter((f) => f.id !== fileId) ?? old,
       );
-      // Close the tab and, if it was active, fall back to an adjacent open tab
       setOpenFiles((prev) => {
         const next = prev.filter((f) => f.id !== fileId);
         setActiveFileId((cur) => {
           if (cur !== fileId) return cur;
-          // Fall back to the last tab in the remaining list, or null if none
           return next.length > 0 ? next[next.length - 1].id : null;
         });
         return next;
       });
+    };
+
+    const onFileCreated = (file: ProjectFile) => {
+      queryClient.setQueryData(getListFilesQueryKey(pId), (old: any[] | undefined) => {
+        if (old?.find(f => f.id === file.id)) return old;
+        return [...(old ?? []), file];
+      });
+    };
+
+    const onFileUpdated = (file: ProjectFile) => {
+      queryClient.setQueryData(getListFilesQueryKey(pId), (old: any[] | undefined) =>
+        old?.map(f => f.id === file.id ? { ...f, ...file } : f) ?? old,
+      );
+    };
+
+    const onFileMoved = (file: ProjectFile) => {
+      queryClient.setQueryData(getListFilesQueryKey(pId), (old: any[] | undefined) =>
+        old?.map(f => f.id === file.id ? { ...f, ...file } : f) ?? old,
+      );
+    };
+
+    const onTypingStart = ({ userId }: { userId: number }) => {
+      setTypingUsers(prev => new Set([...prev, userId]));
+    };
+    const onTypingStop = ({ userId }: { userId: number }) => {
+      setTypingUsers(prev => { const n = new Set(prev); n.delete(userId); return n; });
+    };
+
+    const onFileViewing = ({ fileId, userName }: { fileId: number; userName: string }) => {
+      setFileViewers(prev => ({
+        ...prev,
+        [fileId]: [...(prev[fileId] ?? []).filter(n => n !== userName), userName],
+      }));
     };
 
     on('presence_list', onPresenceList);
@@ -227,6 +266,12 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
     on('code_change', onCodeChange);
     on('chat_message', onChatMessage);
     on('file_deleted', onFileDeleted);
+    on('file_created', onFileCreated);
+    on('file_updated', onFileUpdated);
+    on('file_moved', onFileMoved);
+    on('typing_start', onTypingStart);
+    on('typing_stop', onTypingStop);
+    on('file_viewing', onFileViewing);
 
     return () => {
       off('presence_list', onPresenceList);
@@ -235,8 +280,14 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
       off('code_change', onCodeChange);
       off('chat_message', onChatMessage);
       off('file_deleted', onFileDeleted);
+      off('file_created', onFileCreated);
+      off('file_updated', onFileUpdated);
+      off('file_moved', onFileMoved);
+      off('typing_start', onTypingStart);
+      off('typing_stop', onTypingStop);
+      off('file_viewing', onFileViewing);
     };
-  }, [socket, pId, on, off, queryClient]);
+  }, [socket, pId, on, off, queryClient, emit]);
 
   // Sync initial messages when loaded
   useEffect(() => {
@@ -287,7 +338,7 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
     });
 
     // Subscribe to marker changes across all models
-    const disposable = monaco.editor.onDidChangeModelMarkers(() => {
+    const disposable = monaco.editor.onDidChangeMarkers(() => {
       const allMarkers: DiagnosticMarker[] = [];
       for (const model of monaco.editor.getModels()) {
         const markers = monaco.editor.getModelMarkers({ resource: model.uri });
@@ -348,6 +399,7 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
       setOpenFiles(prev => [...prev, file]);
     }
     setActiveFileId(file.id);
+    emit('file_viewing', { projectId: pId, fileId: file.id });
   };
 
   const handleCloseFile = (e: React.MouseEvent, fileId: number) => {
@@ -386,6 +438,7 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
   const handleSendChat = (e: React.FormEvent) => {
     e.preventDefault();
     if (!chatInput.trim()) return;
+    emit('typing_stop', { projectId: pId });
     
     sendMessage.mutate({
       projectId: pId,
@@ -393,6 +446,12 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
     }, {
       onSuccess: () => setChatInput('')
     });
+  };
+
+  const handleChatInputChange = (value: string) => {
+    setChatInput(value);
+    if (value.trim()) emit('typing_start', { projectId: pId });
+    else emit('typing_stop', { projectId: pId });
   };
 
   const getFileIcon = (file: ProjectFile) => {
@@ -463,7 +522,20 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
           </Button>
           
           <div className="h-4 w-px bg-border mx-1" />
-          
+
+          {/* New page nav buttons */}
+          <Button variant="ghost" size="icon" className="h-8 w-8" title="Team Chat" onClick={() => setLocation(`/projects/${pId}/chat`)}>
+            <MessageSquare className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" title="Activity Dashboard" onClick={() => setLocation(`/projects/${pId}/activity`)}>
+            <Activity className="w-4 h-4" />
+          </Button>
+          <Button variant="ghost" size="icon" className="h-8 w-8" title="Project Docs" onClick={() => setLocation(`/projects/${pId}/docs`)}>
+            <BookOpen className="w-4 h-4" />
+          </Button>
+
+          <div className="h-4 w-px bg-border mx-1" />
+
           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setLeftPanelOpen(!leftPanelOpen)}>
             <PanelLeftClose className={`w-4 h-4 transition-transform ${!leftPanelOpen ? 'rotate-180' : ''}`} />
           </Button>
@@ -483,19 +555,42 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
           {/* LEFT SIDEBAR: File Explorer */}
           {leftPanelOpen && (
             <>
-              <Panel defaultSize={20} minSize={15} maxSize={30} className="bg-card flex flex-col border-r border-border">
+              <Panel defaultSize={20} minSize={15} maxSize={30} className="bg-card flex flex-col border-r border-border relative">
                 <div className="h-9 border-b border-border flex items-center justify-between px-3 shrink-0">
-                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Explorer</span>
-                  <div className="flex items-center gap-1">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsCreatingFile(true)}>
-                      <FilePlus2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
+                  <Tabs value={leftSidebarTab} onValueChange={(v) => setLeftSidebarTab(v as 'files' | 'git')}>
+                    <TabsList className="h-7 bg-transparent p-0 gap-2">
+                      <TabsTrigger value="files" className="text-[10px] uppercase h-7 px-2 data-[state=active]:bg-secondary">Files</TabsTrigger>
+                      <TabsTrigger value="git" className="text-[10px] uppercase h-7 px-2 data-[state=active]:bg-secondary">
+                        <GitBranch className="w-3 h-3 mr-1" />Git
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
                 </div>
                 
-                <ScrollArea className="flex-1">
-                  <FileExplorer projectId={pId} files={files} activeFileId={activeFileId} onOpenFile={handleOpenFile} onCloseFile={handleCloseFile} diagnostics={diagnostics} />
-                </ScrollArea>
+                <div className="flex-1 min-h-0 relative">
+                  {leftSidebarTab === 'files' ? (
+                    <FileExplorer
+                      projectId={pId}
+                      files={files}
+                      activeFileId={activeFileId}
+                      role={project?.role}
+                      onOpenFile={handleOpenFile}
+                      onShowHistory={setHistoryFileId}
+                      diagnostics={diagnostics}
+                    />
+                  ) : (
+                    <GitPanel projectId={pId} />
+                  )}
+                  {historyFileId && (
+                    <FileHistoryPanel
+                      projectId={pId}
+                      fileId={historyFileId}
+                      fileName={files?.find(f => f.id === historyFileId)?.name ?? 'file'}
+                      onClose={() => setHistoryFileId(null)}
+                      onRestored={() => queryClient.invalidateQueries({ queryKey: getListFilesQueryKey(pId) })}
+                    />
+                  )}
+                </div>
               </Panel>
               <PanelResizeHandle className="w-1 bg-border hover:bg-primary/50 transition-colors" />
             </>
@@ -570,8 +665,14 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
                     <TabsTrigger value="console" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 h-full text-xs uppercase tracking-wider">
                       Terminal
                     </TabsTrigger>
+                    <TabsTrigger value="runner" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 h-full text-xs uppercase tracking-wider">
+                      Runner
+                    </TabsTrigger>
+                    <TabsTrigger value="judge" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 h-full text-xs uppercase tracking-wider">
+                      <Gavel className="w-3 h-3 mr-1 inline" />Judge
+                    </TabsTrigger>
                     <TabsTrigger value="problems" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 h-full text-xs uppercase tracking-wider">
-                      Problems
+                      Diagnostics
                       {diagnostics.length > 0 ? (
                         <Badge variant="destructive" className="ml-2 h-4 px-1 rounded-sm text-[10px]">
                           {diagnostics.filter(d => d.severity === 8).length > 0
@@ -608,11 +709,16 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
                     </div>
                   </ScrollArea>
                   <div className="p-3 border-t border-border bg-card shrink-0">
+                    {typingUsers.size > 0 && (
+                      <p className="text-[10px] text-muted-foreground mb-1 animate-pulse">
+                        {typingUsers.size} user{typingUsers.size > 1 ? 's' : ''} typing...
+                      </p>
+                    )}
                     <form onSubmit={handleSendChat} className="flex gap-2">
                       <Input 
                         placeholder="Discuss code..." 
                         value={chatInput}
-                        onChange={e => setChatInput(e.target.value)}
+                        onChange={e => handleChatInputChange(e.target.value)}
                         className="bg-background h-9"
                       />
                       <Button type="submit" size="icon" className="h-9 w-9 shrink-0" disabled={!chatInput.trim()}>
@@ -624,6 +730,14 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
 
                 <TabsContent value="console" className="flex-1 m-0 data-[state=active]:flex flex-col min-h-0 bg-[#09090b]">
                   <TerminalPanel ref={terminalPanelRef} socket={socket} projectId={pId} />
+                </TabsContent>
+
+                <TabsContent value="runner" className="flex-1 m-0 data-[state=active]:flex flex-col min-h-0">
+                  <RunnerPanel projectId={pId} socket={socket} />
+                </TabsContent>
+
+                <TabsContent value="judge" className="flex-1 m-0 data-[state=active]:flex flex-col min-h-0">
+                  <ProblemWorkspace projectId={pId} />
                 </TabsContent>
 
                 <TabsContent value="problems" className="flex-1 m-0 data-[state=active]:flex flex-col min-h-0 bg-background">
@@ -681,6 +795,9 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
                       <TabsTrigger value="ai" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 h-full text-xs uppercase tracking-wider flex items-center gap-1.5">
                         <Sparkles className="w-3 h-3" /> AI
                       </TabsTrigger>
+                      <TabsTrigger value="suggestions" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 h-full text-xs uppercase tracking-wider flex items-center gap-1.5">
+                        Diff
+                      </TabsTrigger>
                       <TabsTrigger value="activity" className="data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-2 h-full text-xs uppercase tracking-wider flex items-center gap-1.5">
                         <Activity className="w-3 h-3" /> Activity
                       </TabsTrigger>
@@ -689,6 +806,10 @@ export default function ProjectIDE({ projectId }: { projectId: string }) {
 
                   <TabsContent value="ai" className="flex-1 m-0 data-[state=active]:flex flex-col min-h-0">
                     <AIPanel projectId={pId} />
+                  </TabsContent>
+
+                  <TabsContent value="suggestions" className="flex-1 m-0 data-[state=active]:flex flex-col min-h-0">
+                    <AiSuggestionsPanel projectId={pId} />
                   </TabsContent>
 
                   <TabsContent value="activity" className="flex-1 m-0 data-[state=active]:flex flex-col min-h-0 overflow-hidden">

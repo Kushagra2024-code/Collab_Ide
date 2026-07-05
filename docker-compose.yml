@@ -1,0 +1,122 @@
+version: '3.9'
+
+# ============================================================
+# CollabIDE — Docker Compose
+# Production-ready orchestration for all services
+# ============================================================
+#
+# Quick start:
+#   1. cp .env.example .env && nano .env   # fill in SESSION_SECRET & GEMINI_API_KEY
+#   2. docker compose up --build -d
+#   3. docker compose exec api-server pnpm --filter @workspace/db run push
+#   4. Open http://localhost:80
+#
+# ============================================================
+
+services:
+
+  # ── PostgreSQL Database ───────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: collabide
+      POSTGRES_PASSWORD: collabide
+      POSTGRES_DB: collabide
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U collabide -d collabide"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - collabide
+
+  # ── Redis (optional — for Socket.IO horizontal scaling) ───
+  # Uncomment to enable multi-instance Socket.IO coordination
+  # redis:
+  #   image: redis:7-alpine
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - collabide
+
+  # ── API Server ────────────────────────────────────────────
+  api-server:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://collabide:collabide@postgres:5432/collabide
+      SESSION_SECRET: ${SESSION_SECRET}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      PORT: 8080
+      NODE_ENV: production
+      SANDBOX_DOCKER: ${SANDBOX_DOCKER:-false}
+      SANDBOX_IMAGE: ${SANDBOX_IMAGE:-ubuntu:22.04}
+    ports:
+      - "8080:8080"
+    volumes:
+      # Mount Docker socket for sandboxed terminal (optional)
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Persistent Yjs document storage
+      - yjs_data:/data/yjs
+    networks:
+      - collabide
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fs http://localhost:8080/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  # ── Frontend (Nginx serving built React app) ──────────────
+  collab-ide:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+      args:
+        VITE_BASE_PATH: /
+        VITE_API_URL: ""
+    restart: unless-stopped
+    depends_on:
+      api-server:
+        condition: service_healthy
+    ports:
+      - "80:80"
+    networks:
+      - collabide
+
+  # ── DB Migration Job (runs once then exits) ───────────────
+  db-migrate:
+    build:
+      context: .
+      dockerfile: Dockerfile.api
+    command: ["pnpm", "--filter", "@workspace/db", "run", "push"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://collabide:collabide@postgres:5432/collabide
+    networks:
+      - collabide
+    restart: "no"
+
+volumes:
+  postgres_data:
+  yjs_data:
+  # redis_data:
+
+networks:
+  collabide:
+    driver: bridge

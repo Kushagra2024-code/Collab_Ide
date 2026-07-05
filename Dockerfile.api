@@ -1,0 +1,73 @@
+# ============================================================
+# Dockerfile.api — API Server (Node.js 20)
+# Multi-stage build: builder → production runner
+# ============================================================
+
+# ── Stage 1: Builder ─────────────────────────────────────────
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+# Install system deps for node-pty and esbuild
+RUN apt-get update && apt-get install -y \
+    python3 make g++ git curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install pnpm
+RUN npm install -g pnpm@9
+
+# Copy workspace config files
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json tsconfig.json ./
+COPY .npmrc* ./
+
+# Copy all packages
+COPY lib/ lib/
+COPY artifacts/api-server/ artifacts/api-server/
+COPY scripts/ scripts/
+
+# Install all dependencies (including dev for build)
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+# Build the API server
+RUN pnpm --filter @workspace/api-server run build
+
+# ── Stage 2: Production ──────────────────────────────────────
+FROM node:20-slim AS production
+
+WORKDIR /app
+
+# Install only runtime system dependencies
+RUN apt-get update && apt-get install -y \
+    curl git bash python3 make g++ \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install pnpm
+RUN npm install -g pnpm@9
+
+# Copy workspace config
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json tsconfig.json ./
+COPY .npmrc* ./
+
+# Copy package sources (needed for workspace resolution at runtime)
+COPY lib/ lib/
+COPY artifacts/api-server/ artifacts/api-server/
+COPY scripts/ scripts/
+
+# Install only production dependencies
+RUN pnpm install --frozen-lockfile --prod --ignore-scripts
+
+# Copy the built dist from builder stage
+COPY --from=builder /app/artifacts/api-server/dist/ artifacts/api-server/dist/
+
+# Create data directory for Yjs persistence
+RUN mkdir -p /data/yjs
+
+# Expose server port
+EXPOSE 8080
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+  CMD curl -fs http://localhost:8080/api/health || exit 1
+
+# Start the server
+CMD ["node", "--enable-source-maps", "artifacts/api-server/dist/index.mjs"]

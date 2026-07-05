@@ -9,14 +9,15 @@ export async function initYjsServer(httpServer?: ReturnType<typeof createServer>
   const port = Number(process.env.YJS_PORT ?? process.env.PORT ?? '1234') + 1;
   try {
     // dynamic import so missing packages don't crash the server
-    // eslint-disable-next-line @typescript-eslint/no-var-requires
+    // @ts-expect-error missing type definitions for optional deps
     const { setupWSConnection } = await import('y-websocket/bin/utils');
+    // @ts-expect-error missing type definitions for optional deps
     const WebSocket = (await import('ws')).Server;
 
     // Try to enable persistent LevelDB-backed storage if available.
     let persistence: any = undefined;
     try {
-      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      // @ts-expect-error missing type definitions for optional deps
       const { LeveldbPersistence } = await import('y-leveldb');
       const storagePath = process.env.YJS_STORAGE_PATH ?? './data/yjs';
       persistence = new LeveldbPersistence(storagePath);
@@ -26,7 +27,7 @@ export async function initYjsServer(httpServer?: ReturnType<typeof createServer>
     }
 
     const wss = new WebSocket({ port, path: '/yjs' });
-    wss.on('connection', (conn, req) => {
+    wss.on('connection', (conn: any, req: any) => {
       try {
         // pass persistence only when available — setupWSConnection will accept it in options
         setupWSConnection(conn, req, { gc: true, persistence });

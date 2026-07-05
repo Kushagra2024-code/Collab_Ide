@@ -28,7 +28,7 @@ function getProjectWorkdir(projectId: string): string {
 }
 
 function spawnShell(cwd: string): ChildProcessWithoutNullStreams {
-  return spawn("bash", ["--norc", "--noprofile"], {
+  return spawn("bash", ["--norc", "--noprofile", "-i"], {
     cwd,
     env: {
       ...process.env,
@@ -47,6 +47,9 @@ interface ConnectedUser {
   avatarUrl: string | null;
   projectId: string | null;
   cursor?: { line: number; column: number };
+  activeFileId?: number | null;
+  selection?: { startLine: number; startColumn: number; endLine: number; endColumn: number };
+  isTyping?: boolean;
 }
 
 const connectedUsers = new Map<string, ConnectedUser>();
@@ -72,6 +75,28 @@ export function emitToUser(userId: number, event: string, data: unknown): void {
   for (const sid of sids) {
     _io?.to(sid).emit(event, data);
   }
+}
+
+/** Send a command to the first active terminal for a project. */
+export function sendToProjectTerminal(projectId: string | number, command: string): boolean {
+  const prefix = `${projectId}:`;
+  for (const [key, session] of terminalSessions) {
+    if (key.startsWith(prefix)) {
+      try {
+        const input = command.endsWith("\n") ? command : command + "\n";
+        if (session.isPty && session.process.write) {
+          session.process.write(input);
+        } else if (session.process.stdin && session.process.stdin.write) {
+          session.process.stdin.write(input);
+        }
+        return true;
+      } catch (e) {
+        logger.error({ err: e }, "Failed to write to project terminal");
+        return false;
+      }
+    }
+  }
+  return false;
 }
 
 /** Verify that a userId is an authorized member of a project (or project is public for reads). */
@@ -234,6 +259,24 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
       socket.to(`project:${projectId}`).emit("cursor_move", { projectId, fileId, line, column, userId, userName, userAvatarUrl });
     });
 
+    socket.on("selection_change", (data: unknown) => {
+      if (typeof data !== "object" || data === null) return;
+      const { projectId, fileId, selection } = data as any;
+      if (!isInRoom(String(projectId))) return;
+      const user = connectedUsers.get(socket.id);
+      if (user) connectedUsers.set(socket.id, { ...user, selection, activeFileId: fileId });
+      socket.to(`project:${projectId}`).emit("selection_change", { projectId, fileId, selection, userId, userName });
+    });
+
+    socket.on("file_viewing", (data: unknown) => {
+      if (typeof data !== "object" || data === null) return;
+      const { projectId, fileId } = data as { projectId: string; fileId: number };
+      if (!isInRoom(String(projectId))) return;
+      const user = connectedUsers.get(socket.id);
+      if (user) connectedUsers.set(socket.id, { ...user, activeFileId: fileId });
+      socket.to(`project:${projectId}`).emit("file_viewing", { projectId, fileId, userId, userName, userAvatarUrl });
+    });
+
     socket.on("chat_message", (data: unknown) => {
       if (typeof data !== "object" || data === null || !("projectId" in data)) return;
       const { projectId, message } = data as { projectId: string; message: any };
@@ -246,6 +289,8 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
       if (typeof data !== "object" || data === null || !("projectId" in data)) return;
       const { projectId } = data as { projectId: string };
       if (!isInRoom(String(projectId))) return;
+      const user = connectedUsers.get(socket.id);
+      if (user) connectedUsers.set(socket.id, { ...user, isTyping: true });
       socket.to(`project:${projectId}`).emit("typing_start", { userId, name: userName });
     });
 
@@ -253,6 +298,8 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
       if (typeof data !== "object" || data === null || !("projectId" in data)) return;
       const { projectId } = data as { projectId: string };
       if (!isInRoom(String(projectId))) return;
+      const user = connectedUsers.get(socket.id);
+      if (user) connectedUsers.set(socket.id, { ...user, isTyping: false });
       socket.to(`project:${projectId}`).emit("typing_stop", { userId });
     });
 
@@ -303,6 +350,7 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
             });
             isPty = true;
           } catch (e) {
+            logger.error({ err: e }, "node-pty-prebuilt-multiarch not available; fallback to spawn");
             // node-pty not available; fallback to spawn
             const cwd = getProjectWorkdir(String(projectId));
             proc = spawnShell(cwd);
@@ -320,10 +368,12 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
         } else {
           // child_process streams
           session.process.stdout?.on?.('data', (chunk: Buffer) => {
-            _io?.to(room).emit('terminal_output', { termId, data: chunk.toString('utf8') });
+            const data = chunk.toString('utf8').replace(/(?<!\r)\n/g, '\r\n');
+            _io?.to(room).emit('terminal_output', { termId, data });
           });
           session.process.stderr?.on?.('data', (chunk: Buffer) => {
-            _io?.to(room).emit('terminal_output', { termId, data: chunk.toString('utf8') });
+            const data = chunk.toString('utf8').replace(/(?<!\r)\n/g, '\r\n');
+            _io?.to(room).emit('terminal_output', { termId, data });
           });
           session.process.on?.('close', (code: number) => {
             _io?.to(room).emit('terminal_exit', { termId, code });
@@ -341,6 +391,7 @@ export function initSocket(httpServer: HttpServer): SocketIOServer {
 
       // Register subscriber
       session.subscribers.add(socket.id);
+      socket.to(`term:${projectId}:${termId}`).emit("terminal_user_joined", { termId, userId, userName });
     });
 
     socket.on("terminal_input", (data: unknown) => {

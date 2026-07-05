@@ -13,27 +13,34 @@ import ProjectIDE from '@/pages/project-ide';
 import ProjectSettings from '@/pages/project-settings';
 import Notifications from '@/pages/notifications';
 import Profile from '@/pages/profile';
+import InvitePage from '@/pages/invite';
+import TeamChat from '@/pages/team-chat';
+import ActivityDashboard from '@/pages/activity-dashboard';
+import ProjectDocs from '@/pages/project-docs';
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 30_000,
+    },
+  },
+});
 
 function Router() {
   return (
     <Switch>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
-      
+
       <Route path="/">
-        <ProtectedRoute>
-          <Dashboard />
-        </ProtectedRoute>
+        <ProtectedRoute><Dashboard /></ProtectedRoute>
       </Route>
-      
+
       <Route path="/dashboard">
-        <ProtectedRoute>
-          <Dashboard />
-        </ProtectedRoute>
+        <ProtectedRoute><Dashboard /></ProtectedRoute>
       </Route>
-      
+
       <Route path="/projects/:projectId">
         {(params) => (
           <ProtectedRoute>
@@ -41,7 +48,7 @@ function Router() {
           </ProtectedRoute>
         )}
       </Route>
-      
+
       <Route path="/projects/:projectId/settings">
         {(params) => (
           <ProtectedRoute>
@@ -49,19 +56,49 @@ function Router() {
           </ProtectedRoute>
         )}
       </Route>
-      
+
+      <Route path="/projects/:projectId/chat">
+        {(params) => (
+          <ProtectedRoute>
+            <div className="h-screen bg-background dark">
+              <TeamChat projectId={parseInt(params.projectId, 10)} />
+            </div>
+          </ProtectedRoute>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/activity">
+        {(params) => (
+          <ProtectedRoute>
+            <div className="dark">
+              <ActivityDashboard projectId={params.projectId} />
+            </div>
+          </ProtectedRoute>
+        )}
+      </Route>
+
+      <Route path="/projects/:projectId/docs">
+        {(params) => (
+          <ProtectedRoute>
+            <div className="dark">
+              <ProjectDocs projectId={params.projectId} />
+            </div>
+          </ProtectedRoute>
+        )}
+      </Route>
+
       <Route path="/notifications">
-        <ProtectedRoute>
-          <Notifications />
-        </ProtectedRoute>
+        <ProtectedRoute><Notifications /></ProtectedRoute>
+      </Route>
+
+      <Route path="/invite/:token">
+        {(params) => <InvitePage token={params.token} />}
       </Route>
 
       <Route path="/profile">
-        <ProtectedRoute>
-          <Profile />
-        </ProtectedRoute>
+        <ProtectedRoute><Profile /></ProtectedRoute>
       </Route>
-      
+
       <Route component={NotFound} />
     </Switch>
   );

@@ -1,0 +1,53 @@
+# ============================================================
+# Dockerfile.frontend — React Frontend (Nginx)
+# Multi-stage build: Node.js builder → Nginx static server
+# ============================================================
+
+# ── Stage 1: Builder ─────────────────────────────────────────
+FROM node:20-slim AS builder
+
+WORKDIR /app
+
+ARG VITE_BASE_PATH=/
+ARG VITE_API_URL=""
+
+ENV VITE_BASE_PATH=${VITE_BASE_PATH}
+ENV VITE_API_URL=${VITE_API_URL}
+
+# Install pnpm
+RUN npm install -g pnpm@9
+
+# Install system deps
+RUN apt-get update && apt-get install -y python3 make g++ git \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy workspace config
+COPY package.json pnpm-workspace.yaml pnpm-lock.yaml tsconfig.base.json tsconfig.json ./
+COPY .npmrc* ./
+
+# Copy all packages needed for build
+COPY lib/ lib/
+COPY artifacts/collab-ide/ artifacts/collab-ide/
+
+# Install all dependencies
+RUN pnpm install --frozen-lockfile --ignore-scripts
+
+# Build the frontend
+RUN BASE_PATH=${VITE_BASE_PATH} pnpm --filter @workspace/collab-ide run build
+
+# ── Stage 2: Nginx ────────────────────────────────────────────
+FROM nginx:1.27-alpine AS production
+
+# Remove default nginx config
+RUN rm /etc/nginx/conf.d/default.conf
+
+# Copy our nginx config
+COPY nginx.conf /etc/nginx/conf.d/collabide.conf
+
+# Copy built frontend assets from builder
+COPY --from=builder /app/artifacts/collab-ide/dist /usr/share/nginx/html
+
+# Nginx listens on 80
+EXPOSE 80
+
+CMD ["nginx", "-g", "daemon off;"]

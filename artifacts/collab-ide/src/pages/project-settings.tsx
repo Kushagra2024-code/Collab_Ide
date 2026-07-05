@@ -13,6 +13,7 @@ import {
   getListProjectMembersQueryKey
 } from '@workspace/api-client-react';
 import { ProjectMemberRole, InviteInputRole } from '@workspace/api-client-react';
+import { extensionsApi } from '@/lib/api-extensions';
 import { useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -67,6 +68,7 @@ export default function ProjectSettings({ projectId }: { projectId: string }) {
   
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteRole, setInviteRole] = useState<InviteInputRole>('editor');
+  const [shareLink, setShareLink] = useState<string | null>(null);
 
   const [initialized, setInitialized] = useState(false);
 
@@ -282,6 +284,28 @@ export default function ProjectSettings({ projectId }: { projectId: string }) {
                   Invite
                 </Button>
               </form>
+            )}
+
+            {canManage && (
+              <div className="mt-4 p-4 border border-border rounded-lg bg-secondary/30">
+                <p className="text-sm font-medium mb-2">Share Link</p>
+                <p className="text-xs text-muted-foreground mb-3">Generate a link to invite users without email.</p>
+                {shareLink ? (
+                  <div className="flex gap-2">
+                    <Input readOnly value={`${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}${shareLink}`} className="h-8 text-xs font-mono" />
+                    <Button variant="outline" size="sm" className="h-8" onClick={() => {
+                      navigator.clipboard.writeText(`${window.location.origin}${import.meta.env.BASE_URL.replace(/\/$/, '')}${shareLink}`);
+                      toast({ title: "Link copied" });
+                    }}>Copy</Button>
+                  </div>
+                ) : (
+                  <Button variant="outline" size="sm" className="h-8" onClick={async () => {
+                    const link = await extensionsApi.createInviteLink(pId, inviteRole, 7);
+                    setShareLink(link.url);
+                    toast({ title: "Share link created" });
+                  }}>Generate Link</Button>
+                )}
+              </div>
             )}
 
             <Table>

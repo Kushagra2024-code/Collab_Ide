@@ -10,7 +10,7 @@ import { db, projectMembersTable, projectsTable } from "@workspace/db";
  */
 export function requireProjectMember(isPublicAllowed = false) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
-    const projectId = parseInt(req.params.projectId ?? req.params.id ?? "", 10);
+    const projectId = parseInt(String(req.params.projectId ?? req.params.id ?? ""), 10);
     if (Number.isNaN(projectId)) {
       res.status(400).json({ error: "Invalid projectId" });
       return;
