@@ -95,6 +95,7 @@ async function buildAll() {
       "wrangler",
       "zeromq",
       "zeromq-prebuilt",
+      "y-websocket",
       "playwright",
       "puppeteer",
       "puppeteer-core",

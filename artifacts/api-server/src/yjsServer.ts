@@ -10,7 +10,8 @@ export async function initYjsServer(httpServer?: ReturnType<typeof createServer>
   try {
     // dynamic import so missing packages don't crash the server
     // @ts-expect-error missing type definitions for optional deps
-    const { setupWSConnection } = await import('y-websocket/bin/utils');
+    // @ts-expect-error missing type definitions for optional deps
+    const { setupWSConnection } = globalThis.require('y-websocket/bin/utils');
     // @ts-expect-error missing type definitions for optional deps
     const WebSocket = (await import('ws')).Server;
 
