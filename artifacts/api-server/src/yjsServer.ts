@@ -15,8 +15,15 @@ export async function initYjsServer(httpServer?: ReturnType<typeof createServer>
       const ywsMod = await import('y-websocket/bin/utils.js');
       setupWSConnection = ywsMod.setupWSConnection ?? ywsMod.default?.setupWSConnection;
     } catch {
-      // @ts-ignore
-      setupWSConnection = (globalThis as any).require('y-websocket/bin/utils.js').setupWSConnection;
+      try {
+        const { createRequire } = await import('node:module');
+        const req = createRequire(import.meta.url);
+        const utilsPath = req.resolve('y-websocket/package.json').replace('package.json', 'bin/utils.js');
+        // @ts-ignore
+        setupWSConnection = req(utilsPath).setupWSConnection;
+      } catch {
+        /* setupWSConnection remains undefined if missing */
+      }
     }
     // @ts-ignore optional dynamic import
     const WebSocket = (await import('ws')).Server;
