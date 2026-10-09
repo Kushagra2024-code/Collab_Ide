@@ -9,7 +9,7 @@ services:
     env: node
     plan: free
     region: ohio
-    buildCommand: pnpm install && pnpm --filter "@workspace/api-server..." run build
+    buildCommand: pnpm install && BASE_PATH=/ VITE_BASE_PATH=/ pnpm --filter "@workspace/collab-ide..." run build && pnpm --filter "@workspace/api-server..." run build
     startCommand: pnpm --filter @workspace/api-server run start
     envVars:
       - key: NODE_ENV

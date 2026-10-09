@@ -1,3 +1,5 @@
+import path from "path";
+import { existsSync } from "fs";
 import express, { type Express, type Request, type Response, type NextFunction } from "express";
 import cors from "cors";
 import pinoHttp from "pino-http";
@@ -67,6 +69,25 @@ app.use("/api", apiRateLimiter);
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api", router);
+
+// ── Static Frontend UI Serving ────────────────────────────────────────────────
+const distPaths = [
+  path.resolve(process.cwd(), "artifacts/collab-ide/dist"),
+  path.resolve(process.cwd(), "../collab-ide/dist"),
+  path.resolve(__dirname, "../../collab-ide/dist"),
+];
+
+const clientDist = distPaths.find((p) => existsSync(p));
+
+if (clientDist) {
+  logger.info({ clientDist }, "Serving frontend static assets");
+  app.use(express.static(clientDist));
+  app.get("*", (req: Request, res: Response, next: NextFunction) => {
+    if (req.path.startsWith("/api") || req.path.startsWith("/ws")) return next();
+    res.sendFile(path.join(clientDist, "index.html"));
+  });
+}
+
 app.use(errorHandler);
 
 export default app;
