@@ -174,40 +174,12 @@ importers:
 
   artifacts/collab-ide:
     dependencies:
-      '@monaco-editor/react':
-        specifier: ^4.7.0
-        version: 4.7.0(monaco-editor@0.53.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
-      '@xterm/addon-fit':
-        specifier: ^0.11.0
-        version: 0.11.0
-      '@xterm/addon-web-links':
-        specifier: ^0.12.0
-        version: 0.12.0
-      '@xterm/xterm':
-        specifier: ^6.0.0
-        version: 6.0.0
-      monaco-editor:
-        specifier: ^0.53.0
-        version: 0.53.0
-      socket.io-client:
-        specifier: ^4.8.3
-        version: 4.8.3
-      y-monaco:
-        specifier: ^0.1.6
-        version: 0.1.6(monaco-editor@0.53.0)(yjs@13.6.31)
-      y-protocols:
-        specifier: ^1.0.6
-        version: 1.0.7(yjs@13.6.31)
-      y-websocket:
-        specifier: ^3.0.0
-        version: 3.0.0(yjs@13.6.31)
-      yjs:
-        specifier: ^13.6.26
-        version: 13.6.31
-    devDependencies:
       '@hookform/resolvers':
         specifier: ^3.10.0
         version: 3.10.0(react-hook-form@7.80.0(react@19.1.0))
+      '@monaco-editor/react':
+        specifier: ^4.7.0
+        version: 4.7.0(monaco-editor@0.53.0)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
       '@radix-ui/react-accordion':
         specifier: ^1.2.4
         version: 1.2.14(@types/react-dom@19.2.3(@types/react@19.2.17))(@types/react@19.2.17)(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -322,6 +294,15 @@ importers:
       '@workspace/api-client-react':
         specifier: workspace:*
         version: link:../../lib/api-client-react
+      '@xterm/addon-fit':
+        specifier: ^0.11.0
+        version: 0.11.0
+      '@xterm/addon-web-links':
+        specifier: ^0.12.0
+        version: 0.12.0
+      '@xterm/xterm':
+        specifier: ^6.0.0
+        version: 6.0.0
       class-variance-authority:
         specifier: 'catalog:'
         version: 0.7.1
@@ -346,6 +327,9 @@ importers:
       lucide-react:
         specifier: 'catalog:'
         version: 0.545.0(react@19.1.0)
+      monaco-editor:
+        specifier: ^0.53.0
+        version: 0.53.0
       next-themes:
         specifier: ^0.4.6
         version: 0.4.6(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -370,6 +354,9 @@ importers:
       recharts:
         specifier: ^2.15.2
         version: 2.15.4(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
+      socket.io-client:
+        specifier: ^4.8.3
+        version: 4.8.3
       sonner:
         specifier: ^2.0.7
         version: 2.0.7(react-dom@19.1.0(react@19.1.0))(react@19.1.0)
@@ -391,6 +378,18 @@ importers:
       wouter:
         specifier: ^3.3.5
         version: 3.10.0(react@19.1.0)
+      y-monaco:
+        specifier: ^0.1.6
+        version: 0.1.6(monaco-editor@0.53.0)(yjs@13.6.31)
+      y-protocols:
+        specifier: ^1.0.6
+        version: 1.0.7(yjs@13.6.31)
+      y-websocket:
+        specifier: ^3.0.0
+        version: 3.0.0(yjs@13.6.31)
+      yjs:
+        specifier: ^13.6.26
+        version: 13.6.31
       zod:
         specifier: 'catalog:'
         version: 3.25.76
