@@ -4,6 +4,7 @@ import pinoHttp from "pino-http";
 import router from "./routes";
 import { errorHandler } from "./middlewares/errorHandler";
 import { logger } from "./lib/logger";
+import { authRateLimiter, apiRateLimiter } from "./middlewares/rateLimit";
 
 const app: Express = express();
 
@@ -37,14 +38,14 @@ app.use(
 // ── CORS ─────────────────────────────────────────────────────────────────────
 const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(",").map((s) => s.trim())
-  : ["http://localhost:3000", "http://localhost:80", "http://localhost"];
+  : ["http://localhost:3000", "http://localhost:5173", "http://localhost:80", "http://localhost"];
 
 app.use(
   cors({
     origin: (origin, callback) => {
       // Allow requests with no origin (curl, mobile apps, same-origin)
       if (!origin) return callback(null, true);
-      if (allowedOrigins.includes(origin) || process.env.NODE_ENV === "development") {
+      if (allowedOrigins.includes(origin) || (process.env.NODE_ENV === "development" && origin.startsWith("http://localhost"))) {
         return callback(null, true);
       }
       logger.warn({ origin }, "CORS blocked");
@@ -59,6 +60,10 @@ app.use(
 // ── Body Parsing ──────────────────────────────────────────────────────────────
 app.use(express.json({ limit: "10mb" }));
 app.use(express.urlencoded({ extended: true, limit: "10mb" }));
+
+// ── Rate Limiting ──────────────────────────────────────────────────────────────
+app.use("/api/auth", authRateLimiter);
+app.use("/api", apiRateLimiter);
 
 // ── Routes ────────────────────────────────────────────────────────────────────
 app.use("/api", router);

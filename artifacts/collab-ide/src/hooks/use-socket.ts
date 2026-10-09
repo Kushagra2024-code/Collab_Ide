@@ -16,10 +16,14 @@ interface SocketEvents {
   code_change: (data: { fileId: number; content: string; userId: number; userName: string }) => void;
   user_joined: (data: { userId: number; name: string; avatarUrl: string | null }) => void;
   user_left: (data: { userId: number }) => void;
-  chat_message: (data: { id: number; content: string; userId: number; userName: string; userAvatarUrl: string | null; createdAt: string }) => void;
+  chat_message: (data: any) => void;
   typing_start: (data: { userId: number; name: string }) => void;
   typing_stop: (data: { userId: number }) => void;
   file_deleted: (data: { fileId: number; projectId: number }) => void;
+  file_created: (data: any) => void;
+  file_updated: (data: any) => void;
+  file_moved: (data: any) => void;
+  file_viewing: (data: any) => void;
   notification_received: (data: { id: number; type: string; message: string; isRead: boolean; projectId: number | null; projectName: string | null; fromUserId: number | null; fromUserName: string | null; createdAt: string }) => void;
   error: (data: { message: string }) => void;
 }

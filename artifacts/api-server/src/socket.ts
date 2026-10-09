@@ -111,9 +111,23 @@ async function isAuthorizedForProject(userId: number, projectId: number): Promis
 }
 
 export function initSocket(httpServer: HttpServer): SocketIOServer {
+  const allowedOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(",").map((s) => s.trim())
+    : ["http://localhost:3000", "http://localhost:5173", "http://localhost:80", "http://localhost"];
+
   const io = new SocketIOServer(httpServer, {
     path: "/ws/socket.io",
-    cors: { origin: "*", methods: ["GET", "POST"] },
+    cors: {
+      origin: (origin, callback) => {
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin) || (process.env.NODE_ENV === "development" && origin.startsWith("http://localhost"))) {
+          return callback(null, true);
+        }
+        return callback(new Error("CORS policy violation"), false);
+      },
+      methods: ["GET", "POST"],
+      credentials: true,
+    },
   });
 
   _io = io;

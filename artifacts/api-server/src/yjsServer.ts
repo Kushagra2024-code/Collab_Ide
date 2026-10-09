@@ -9,16 +9,15 @@ export async function initYjsServer(httpServer?: ReturnType<typeof createServer>
   const port = Number(process.env.YJS_PORT ?? process.env.PORT ?? '1234') + 1;
   try {
     // dynamic import so missing packages don't crash the server
-    // @ts-expect-error missing type definitions for optional deps
-    // @ts-expect-error missing type definitions for optional deps
-    const { setupWSConnection } = globalThis.require('y-websocket/bin/utils');
-    // @ts-expect-error missing type definitions for optional deps
+    // @ts-ignore optional dynamic import
+    const { setupWSConnection } = (globalThis as any).require('y-websocket/bin/utils');
+    // @ts-ignore optional dynamic import
     const WebSocket = (await import('ws')).Server;
 
     // Try to enable persistent LevelDB-backed storage if available.
     let persistence: any = undefined;
     try {
-      // @ts-expect-error missing type definitions for optional deps
+      // @ts-ignore optional dynamic import
       const { LeveldbPersistence } = await import('y-leveldb');
       const storagePath = process.env.YJS_STORAGE_PATH ?? './data/yjs';
       persistence = new LeveldbPersistence(storagePath);

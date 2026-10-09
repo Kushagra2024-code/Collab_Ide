@@ -22,6 +22,7 @@ import {
   SendGeminiMessageParams,
   SendGeminiMessageBody,
 } from "@workspace/api-zod";
+import { safeJoin } from "../lib/path";
 import { logger } from "../lib/logger";
 
 const execPromise = promisify(exec);
@@ -87,10 +88,14 @@ async function syncFilesToDisk(projectId: number): Promise<string> {
     .where(and(eq(projectFilesTable.projectId, projectId), eq(projectFilesTable.type, "file")));
 
   for (const file of files) {
-    const filePath = path.join(workdir, file.path || file.name);
-    const dir = path.dirname(filePath);
-    if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-    writeFileSync(filePath, file.content ?? "", "utf8");
+    try {
+      const filePath = safeJoin(workdir, file.path || file.name);
+      const dir = path.dirname(filePath);
+      if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
+      writeFileSync(filePath, file.content ?? "", "utf8");
+    } catch (err) {
+      logger.warn({ err, fileId: file.id }, "Skipping file sync due to invalid path");
+    }
   }
   return workdir;
 }

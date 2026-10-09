@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { eq, and, desc } from "drizzle-orm";
-import { spawn } from "child_process";
-import { writeFileSync, unlinkSync, mkdirSync, existsSync } from "fs";
+import { spawn, spawnSync } from "child_process";
+import { writeFileSync, unlinkSync, mkdirSync, existsSync, rmSync } from "fs";
 import path from "path";
 import os from "os";
 import { db, problemsTable, problemSubmissionsTable, usersTable, activityLogsTable } from "@workspace/db";
@@ -22,51 +22,100 @@ interface TestCase { input: string; expectedOutput: string }
 function runCode(language: string, code: string, input: string): Promise<{ stdout: string; stderr: string; timeMs: number; exitCode: number }> {
   return new Promise((resolve) => {
     const start = Date.now();
-    const tmpDir = getTempDir();
+    const baseDir = getTempDir();
     const id = `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+    const runDir = path.join(baseDir, id);
+    mkdirSync(runDir, { recursive: true });
 
-    let command: string;
-    let filePath: string;
+    let exeBin: string;
+    let exeArgs: string[] = [];
+    let cleanupPaths: string[] = [runDir];
 
-    switch (language) {
-      case "python":
-        filePath = path.join(tmpDir, `${id}.py`);
-        writeFileSync(filePath, code);
-        command = `python3 "${filePath}"`;
-        break;
-      case "javascript":
-        filePath = path.join(tmpDir, `${id}.js`);
-        writeFileSync(filePath, code);
-        command = `node "${filePath}"`;
-        break;
-      case "cpp":
-        filePath = path.join(tmpDir, `${id}.cpp`);
-        writeFileSync(filePath, code);
-        command = `g++ -o "${tmpDir}/${id}" "${filePath}" && echo "${input.replace(/"/g, '\\"')}" | "${tmpDir}/${id}"`;
-        break;
-      case "java": {
-        filePath = path.join(tmpDir, `Main.java`);
-        writeFileSync(filePath, code);
-        command = `cd "${tmpDir}" && javac Main.java && echo "${input.replace(/"/g, '\\"')}" | java Main`;
-        break;
+    try {
+      switch (language) {
+        case "python": {
+          const filePath = path.join(runDir, "script.py");
+          writeFileSync(filePath, code, "utf8");
+          exeBin = "python3";
+          exeArgs = [filePath];
+          break;
+        }
+        case "javascript": {
+          const filePath = path.join(runDir, "script.js");
+          writeFileSync(filePath, code, "utf8");
+          exeBin = "node";
+          exeArgs = [filePath];
+          break;
+        }
+        case "cpp": {
+          const filePath = path.join(runDir, "main.cpp");
+          const outBin = path.join(runDir, "main");
+          writeFileSync(filePath, code, "utf8");
+          const compile = spawnSync("g++", ["-o", outBin, filePath], { cwd: runDir, timeout: 10000 });
+          if (compile.status !== 0) {
+            rmSync(runDir, { recursive: true, force: true });
+            resolve({
+              stdout: "",
+              stderr: compile.stderr ? compile.stderr.toString() : "Compilation failed",
+              timeMs: Date.now() - start,
+              exitCode: compile.status ?? 1,
+            });
+            return;
+          }
+          exeBin = outBin;
+          exeArgs = [];
+          break;
+        }
+        case "java": {
+          const filePath = path.join(runDir, "Main.java");
+          writeFileSync(filePath, code, "utf8");
+          const compile = spawnSync("javac", ["Main.java"], { cwd: runDir, timeout: 10000 });
+          if (compile.status !== 0) {
+            rmSync(runDir, { recursive: true, force: true });
+            resolve({
+              stdout: "",
+              stderr: compile.stderr ? compile.stderr.toString() : "Java compilation failed",
+              timeMs: Date.now() - start,
+              exitCode: compile.status ?? 1,
+            });
+            return;
+          }
+          exeBin = "java";
+          exeArgs = ["-cp", runDir, "Main"];
+          break;
+        }
+        default: {
+          const filePath = path.join(runDir, "script.py");
+          writeFileSync(filePath, code, "utf8");
+          exeBin = "python3";
+          exeArgs = [filePath];
+        }
       }
-      default:
-        filePath = path.join(tmpDir, `${id}.py`);
-        writeFileSync(filePath, code);
-        command = `python3 "${filePath}"`;
-    }
 
-    const proc = spawn("bash", ["-c", command], { timeout: 10000 });
-    let stdout = "";
-    let stderr = "";
-    proc.stdout?.on("data", (c: Buffer) => { stdout += c.toString(); });
-    proc.stderr?.on("data", (c: Buffer) => { stderr += c.toString(); });
-    proc.on("close", (code) => {
-      try { if (filePath && existsSync(filePath)) unlinkSync(filePath); } catch { /* ignore */ }
-      resolve({ stdout: stdout.trim(), stderr, timeMs: Date.now() - start, exitCode: code ?? 1 });
-    });
-    proc.stdin?.write(input);
-    proc.stdin?.end();
+      const proc = spawn(exeBin, exeArgs, { cwd: runDir, timeout: 10000 });
+      let stdout = "";
+      let stderr = "";
+
+      proc.stdout?.on("data", (c: Buffer) => { stdout += c.toString(); });
+      proc.stderr?.on("data", (c: Buffer) => { stderr += c.toString(); });
+      proc.on("close", (code) => {
+        try { rmSync(runDir, { recursive: true, force: true }); } catch { /* ignore */ }
+        resolve({ stdout: stdout.trim(), stderr, timeMs: Date.now() - start, exitCode: code ?? 1 });
+      });
+
+      proc.on("error", (err) => {
+        try { rmSync(runDir, { recursive: true, force: true }); } catch { /* ignore */ }
+        resolve({ stdout: "", stderr: err.message, timeMs: Date.now() - start, exitCode: 1 });
+      });
+
+      if (input) {
+        proc.stdin?.write(input);
+      }
+      proc.stdin?.end();
+    } catch (err: any) {
+      try { rmSync(runDir, { recursive: true, force: true }); } catch { /* ignore */ }
+      resolve({ stdout: "", stderr: err?.message ?? "Execution error", timeMs: Date.now() - start, exitCode: 1 });
+    }
   });
 }
 
