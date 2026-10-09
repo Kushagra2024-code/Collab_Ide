@@ -82,9 +82,12 @@ const clientDist = distPaths.find((p) => existsSync(p));
 if (clientDist) {
   logger.info({ clientDist }, "Serving frontend static assets");
   app.use(express.static(clientDist));
-  app.get("*", (req: Request, res: Response, next: NextFunction) => {
+  app.use((req: Request, res: Response, next: NextFunction) => {
     if (req.path.startsWith("/api") || req.path.startsWith("/ws")) return next();
-    res.sendFile(path.join(clientDist, "index.html"));
+    if (req.method === "GET") {
+      return res.sendFile(path.join(clientDist, "index.html"));
+    }
+    next();
   });
 }
 
