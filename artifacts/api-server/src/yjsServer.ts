@@ -9,8 +9,15 @@ export async function initYjsServer(httpServer?: ReturnType<typeof createServer>
   const port = Number(process.env.YJS_PORT ?? process.env.PORT ?? '1234') + 1;
   try {
     // dynamic import so missing packages don't crash the server
-    // @ts-ignore optional dynamic import
-    const { setupWSConnection } = (globalThis as any).require('y-websocket/bin/utils');
+    let setupWSConnection: any;
+    try {
+      // @ts-ignore
+      const ywsMod = await import('y-websocket/bin/utils.js');
+      setupWSConnection = ywsMod.setupWSConnection ?? ywsMod.default?.setupWSConnection;
+    } catch {
+      // @ts-ignore
+      setupWSConnection = (globalThis as any).require('y-websocket/bin/utils.js').setupWSConnection;
+    }
     // @ts-ignore optional dynamic import
     const WebSocket = (await import('ws')).Server;
 
