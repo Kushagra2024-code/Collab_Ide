@@ -25,8 +25,13 @@ export async function initYjsServer(httpServer?: ReturnType<typeof createServer>
         /* setupWSConnection remains undefined if missing */
       }
     }
-    // @ts-ignore optional dynamic import
-    const WebSocket = (await import('ws')).Server;
+
+    const wsMod: any = await import('ws');
+    const WebSocketServerClass = wsMod.WebSocketServer || wsMod.Server || wsMod.default?.WebSocketServer || wsMod.default?.Server;
+
+    if (!WebSocketServerClass) {
+      throw new Error('WebSocketServer constructor not found on ws module');
+    }
 
     // Try to enable persistent LevelDB-backed storage if available.
     let persistence: any = undefined;
@@ -40,17 +45,24 @@ export async function initYjsServer(httpServer?: ReturnType<typeof createServer>
       logger.info('y-leveldb not available — running Yjs in-memory (no persistence)');
     }
 
-    const wss = new WebSocket({ port, path: '/yjs' });
+    const wss = httpServer && !process.env.YJS_PORT
+      ? new WebSocketServerClass({ server: httpServer, path: '/yjs' })
+      : new WebSocketServerClass({ port, path: '/yjs' });
+
     wss.on('connection', (conn: any, req: any) => {
       try {
-        // pass persistence only when available — setupWSConnection will accept it in options
-        setupWSConnection(conn, req, { gc: true, persistence });
+        if (setupWSConnection) {
+          setupWSConnection(conn, req, { gc: true, persistence });
+        }
       } catch (e) {
         logger.error({ err: e }, 'Yjs setupWSConnection failed');
       }
     });
 
-    logger.info({ port }, 'Yjs WebSocket server started (optional persistence applied)');
+    logger.info(
+      httpServer && !process.env.YJS_PORT ? { path: '/yjs' } : { port },
+      'Yjs WebSocket server started (optional persistence applied)'
+    );
     return true;
   } catch (err) {
     logger.warn({ err }, 'Yjs server not started (missing optional deps)');
