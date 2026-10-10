@@ -20,7 +20,9 @@ export default function Login() {
     try {
       await loginUser({ email: email.trim(), password });
     } catch (err: any) {
-      setError(err.message || 'Failed to login');
+      let msg = err.message || 'Failed to login';
+      msg = msg.replace(/^HTTP\s+\d+:\s*/i, '');
+      setError(msg);
     } finally {
       setIsLoading(false);
     }

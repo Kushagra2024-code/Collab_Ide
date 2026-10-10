@@ -21,7 +21,9 @@ export default function Register() {
     try {
       await registerUser({ name, email: email.trim(), password });
     } catch (err: any) {
-      setError(err.message || 'Failed to create account');
+      let msg = err.message || 'Failed to create account';
+      msg = msg.replace(/^HTTP\s+\d+:\s*/i, '');
+      setError(msg);
     } finally {
       setIsLoading(false);
     }
