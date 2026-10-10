@@ -33,6 +33,10 @@ export function errorHandler(
     return;
   }
 
-  logger.error({ err, url: req.url, method: req.method }, "Unhandled error");
+  const errDetails = err instanceof Error
+    ? { message: err.message, stack: err.stack, name: err.name }
+    : (typeof err === "object" && err !== null ? { ...err } : String(err));
+
+  logger.error({ err: errDetails, url: req.url, method: req.method }, "Unhandled error");
   res.status(500).json({ error: "Internal server error" });
 }

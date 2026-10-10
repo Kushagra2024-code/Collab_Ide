@@ -4,12 +4,10 @@ import * as schema from "./schema";
 
 const { Pool } = pg;
 
-const connectionString = process.env.DATABASE_URL;
+const connectionString = process.env.DATABASE_URL || "postgres://postgres:postgres@localhost:5432/collabide";
 
-if (!connectionString) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?",
-  );
+if (!process.env.DATABASE_URL) {
+  console.warn("DATABASE_URL is not set. Using local default connection string.");
 }
 
 const requiresSsl = process.env.NODE_ENV === "production" ||
