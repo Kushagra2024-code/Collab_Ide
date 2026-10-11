@@ -88,6 +88,10 @@ function verifyJwt(req, res, next) {
   }
 }
 
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // ---------------- AUTHENTICATION ENDPOINTS ---------------- //
 
 app.post('/api/auth/login', (req, res) => {
