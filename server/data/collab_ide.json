@@ -1,0 +1,315 @@
+{
+  "users": [
+    {
+      "id": "usr_1791631178543",
+      "name": "Alex Rivera",
+      "email": "alex.rivera@company.com",
+      "role": "owner",
+      "avatarColor": "#3B82F6",
+      "initials": "AR"
+    },
+    {
+      "id": "usr_oauth_127",
+      "name": "Google Dev 127",
+      "email": "dev127@google.com",
+      "role": "viewer",
+      "avatarColor": "#4285F4",
+      "initials": "GO"
+    },
+    {
+      "id": "usr_1791631303445",
+      "name": "kushagra",
+      "email": "kushagra@gmail.com",
+      "role": "admin",
+      "avatarColor": "#3B82F6",
+      "initials": "K"
+    }
+  ],
+  "workspace": {
+    "id": "ws_prod",
+    "name": "Production Engineering Workspace",
+    "description": "AI-Powered Collaborative Platform",
+    "inviteCode": "COLLAB-PROD-2026",
+    "createdAt": "2026-10-10T11:19:09.841Z",
+    "members": [
+      {
+        "userId": "usr_1791631178543",
+        "role": "owner",
+        "joinedAt": "2026-10-10T11:19:38.543Z"
+      },
+      {
+        "userId": "usr_oauth_127",
+        "role": "viewer",
+        "joinedAt": "2026-10-10T11:20:43.839Z"
+      },
+      {
+        "userId": "usr_1791631303445",
+        "role": "admin",
+        "joinedAt": "2026-10-10T11:21:43.445Z"
+      }
+    ]
+  },
+  "files": [
+    {
+      "id": "f_readme",
+      "name": "README.md",
+      "path": "/README.md",
+      "type": "file",
+      "parentId": null,
+      "language": "markdown",
+      "content": "# ⚡ Collab IDE — Production Workspace\n\nWelcome to your collaborative workspace!\n\n## Getting Started\n- Create files and folders using the Explorer sidebar.\n- Run Python and JavaScript code live in the Execution Terminal.\n- Invite collaborators using your Workspace Invite Link.",
+      "updatedAt": "2026-10-10T11:19:09.841Z"
+    },
+    {
+      "id": "folder_1791631329267",
+      "name": "folder",
+      "path": "/folder",
+      "type": "folder",
+      "parentId": null,
+      "updatedAt": "2026-10-10T11:22:09.267Z"
+    },
+    {
+      "id": "f_1791631343177",
+      "name": "file.py",
+      "path": "/folder/file.py",
+      "type": "file",
+      "parentId": "folder_1791631329267",
+      "language": "python",
+      "content": "# file.py\nprint(\"Hello from Python 3!\")\nggggggggggggggggggggggggggggggggg\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n0\n\n\n\n\n\n\n\n\n\n0\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n",
+      "updatedAt": "2026-10-10T11:26:07.825Z"
+    }
+  ],
+  "versions": {
+    "f_readme": [
+      {
+        "id": "v_init",
+        "versionNumber": 1,
+        "timestamp": "2026-10-10T11:19:09.841Z",
+        "authorName": "System",
+        "commitMessage": "Initial Production Workspace creation",
+        "content": "# ⚡ Collab IDE — Production Workspace\n\nWelcome to your collaborative workspace!"
+      }
+    ],
+    "f_1791631343177": [
+      {
+        "id": "v_1791631343177",
+        "versionNumber": 1,
+        "timestamp": "2026-10-10T11:22:23.177Z",
+        "authorName": "kushagra",
+        "commitMessage": "Initial creation of file.py",
+        "content": "# file.py\nprint(\"Hello from Python 3!\")\n"
+      }
+    ]
+  },
+  "chat": [],
+  "activity": [
+    {
+      "id": "act_1791631601996_qxxm",
+      "timestamp": "2026-10-10T11:26:41.996Z",
+      "userId": "usr_1791631303445",
+      "userName": "kushagra",
+      "userRole": "admin",
+      "action": "USER_LEFT",
+      "details": "kushagra disconnected"
+    },
+    {
+      "id": "act_1791631601991_nfjt",
+      "timestamp": "2026-10-10T11:26:41.991Z",
+      "userId": "usr_guest",
+      "userName": "Guest Developer",
+      "userRole": "viewer",
+      "action": "USER_LEFT",
+      "details": "Guest Developer disconnected"
+    },
+    {
+      "id": "act_1791631601989_6z39",
+      "timestamp": "2026-10-10T11:26:41.989Z",
+      "userId": "usr_guest",
+      "userName": "Guest Developer",
+      "userRole": "viewer",
+      "action": "USER_LEFT",
+      "details": "Guest Developer disconnected"
+    },
+    {
+      "id": "act_1791631601983_xk65",
+      "timestamp": "2026-10-10T11:26:41.983Z",
+      "userId": "usr_guest",
+      "userName": "Guest Developer",
+      "userRole": "viewer",
+      "action": "USER_LEFT",
+      "details": "Guest Developer disconnected"
+    },
+    {
+      "id": "act_1791631601978_ekav",
+      "timestamp": "2026-10-10T11:26:41.978Z",
+      "userId": "usr_guest",
+      "userName": "Guest Developer",
+      "userRole": "viewer",
+      "action": "USER_LEFT",
+      "details": "Guest Developer disconnected"
+    },
+    {
+      "id": "act_1791631401299_x14t",
+      "timestamp": "2026-10-10T11:23:21.299Z",
+      "userId": "usr_1791631303445",
+      "userName": "kushagra",
+      "userRole": "admin",
+      "action": "ROLE_UPDATED",
+      "details": "Updated Google Dev 127's role to VIEWER"
+    },
+    {
+      "id": "act_1791631343178_yudm",
+      "timestamp": "2026-10-10T11:22:23.178Z",
+      "userId": "usr_1791631303445",
+      "userName": "kushagra",
+      "userRole": "admin",
+      "action": "FILE_CREATED",
+      "details": "Created file file.py in /folder"
+    },
+    {
+      "id": "act_1791631329267_7k35",
+      "timestamp": "2026-10-10T11:22:09.267Z",
+      "userId": "usr_1791631303445",
+      "userName": "kushagra",
+      "userRole": "admin",
+      "action": "FOLDER_CREATED",
+      "details": "Created folder folder in root"
+    },
+    {
+      "id": "act_1791631303625_pmyb",
+      "timestamp": "2026-10-10T11:21:43.625Z",
+      "userId": "usr_1791631303445",
+      "userName": "kushagra",
+      "userRole": "admin",
+      "action": "USER_JOINED",
+      "details": "kushagra joined workspace"
+    },
+    {
+      "id": "act_1791631303578_4tky",
+      "timestamp": "2026-10-10T11:21:43.578Z",
+      "userId": "usr_guest",
+      "userName": "Guest Developer",
+      "userRole": "viewer",
+      "action": "USER_LEFT",
+      "details": "Guest Developer disconnected"
+    },
+    {
+      "id": "act_1791631303448_ehb2",
+      "timestamp": "2026-10-10T11:21:43.448Z",
+      "userId": "usr_1791631303445",
+      "userName": "kushagra",
+      "userRole": "admin",
+      "action": "USER_REGISTERED",
+      "details": "Created account \"kushagra\" (ADMIN)"
+    },
+    {
+      "id": "act_1791631251968_pfj5",
+      "timestamp": "2026-10-10T11:20:51.968Z",
+      "userId": "usr_guest",
+      "userName": "Guest Developer",
+      "userRole": "viewer",
+      "action": "USER_JOINED",
+      "details": "Guest Developer joined workspace"
+    },
+    {
+      "id": "act_1791631251926_94aw",
+      "timestamp": "2026-10-10T11:20:51.926Z",
+      "userId": "usr_oauth_127",
+      "userName": "Google Dev 127",
+      "userRole": "editor",
+      "action": "USER_LEFT",
+      "details": "Google Dev 127 disconnected"
+    },
+    {
+      "id": "act_1791631244046_9y08",
+      "timestamp": "2026-10-10T11:20:44.047Z",
+      "userId": "usr_oauth_127",
+      "userName": "Google Dev 127",
+      "userRole": "editor",
+      "action": "USER_JOINED",
+      "details": "Google Dev 127 joined workspace"
+    },
+    {
+      "id": "act_1791631243976_3qxb",
+      "timestamp": "2026-10-10T11:20:43.976Z",
+      "userId": "usr_guest",
+      "userName": "Guest Developer",
+      "userRole": "viewer",
+      "action": "USER_LEFT",
+      "details": "Guest Developer disconnected"
+    },
+    {
+      "id": "act_1791631243841_ocqg",
+      "timestamp": "2026-10-10T11:20:43.841Z",
+      "userId": "usr_oauth_127",
+      "userName": "Google Dev 127",
+      "userRole": "editor",
+      "action": "OAUTH_LOGIN",
+      "details": "Authenticated via GOOGLE OAuth"
+    },
+    {
+      "id": "act_1791631231138_a6rk",
+      "timestamp": "2026-10-10T11:20:31.138Z",
+      "userId": "usr_guest",
+      "userName": "Guest Developer",
+      "userRole": "viewer",
+      "action": "USER_JOINED",
+      "details": "Guest Developer joined workspace"
+    },
+    {
+      "id": "act_1791631178555_4xcn",
+      "timestamp": "2026-10-10T11:19:38.555Z",
+      "userId": "usr_1791631178543",
+      "userName": "Alex Rivera",
+      "userRole": "owner",
+      "action": "USER_REGISTERED",
+      "details": "Created account \"Alex Rivera\" (OWNER)"
+    },
+    {
+      "id": "act_1791631152426_lxmp",
+      "timestamp": "2026-10-10T11:19:12.426Z",
+      "userId": "usr_guest",
+      "userName": "Guest Developer",
+      "userRole": "viewer",
+      "action": "USER_JOINED",
+      "details": "Guest Developer joined workspace"
+    },
+    {
+      "id": "act_1791631152411_tj6y",
+      "timestamp": "2026-10-10T11:19:12.411Z",
+      "userId": "usr_guest",
+      "userName": "Guest Developer",
+      "userRole": "viewer",
+      "action": "USER_JOINED",
+      "details": "Guest Developer joined workspace"
+    },
+    {
+      "id": "act_1791631152394_zhry",
+      "timestamp": "2026-10-10T11:19:12.394Z",
+      "userId": "usr_guest",
+      "userName": "Guest Developer",
+      "userRole": "viewer",
+      "action": "USER_JOINED",
+      "details": "Guest Developer joined workspace"
+    },
+    {
+      "id": "act_1791631152389_y3u8",
+      "timestamp": "2026-10-10T11:19:12.389Z",
+      "userId": "usr_guest",
+      "userName": "Guest Developer",
+      "userRole": "viewer",
+      "action": "USER_JOINED",
+      "details": "Guest Developer joined workspace"
+    },
+    {
+      "id": "act_1791631149841",
+      "timestamp": "2026-10-10T11:19:09.841Z",
+      "userId": "system",
+      "userName": "System Engine",
+      "userRole": "owner",
+      "action": "SYSTEM_BOOT",
+      "details": "Initialized Production Workspace Environment"
+    }
+  ],
+  "comments": {}
+}
